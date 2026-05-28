@@ -8,6 +8,13 @@ class Settings(BaseSettings):
         extra="ignore"
     )
 
+    # --- AWS Config ---
+    REGION: str | None = None
+    # --- Cognito ---
+    COGNITO_USER_POOL_ID: str
+    COGNITO_CLIENT_ID: str
+    DISABLE_EMAILS: bool
+
     DATABASE_URL: str
 
 

@@ -4,11 +4,10 @@ from sqlalchemy import Column, Integer, String, Boolean, DateTime, func
 class User(Base):
     __tablename__ = "users"
 
-    id = Column(Integer, primary_key=True)
+    id = Column(String(36), primary_key=True) 
     email = Column(String(255),unique=True,nullable=False,index=True)
     first_name = Column(String(255),nullable=False)
     last_name = Column(String(255),nullable=False)
-    password = Column(String(255),nullable=False)
     is_active = Column(Boolean,nullable=False,default=True)
     is_email_verified = Column(Boolean,nullable=False,default=True)
     created_at = Column(
