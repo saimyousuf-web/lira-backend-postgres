@@ -1,7 +1,5 @@
 import boto3
-from boto3.dynamodb.conditions import Key, Attr
 from fastapi import HTTPException, Depends
-from fastapi.responses import JSONResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import requests
 from jose import jwt
@@ -9,8 +7,12 @@ from fastapi import HTTPException
 from functools import lru_cache
 from core.config import settings
 from fastapi.security import HTTPBearer
-from botocore.exceptions import ClientError
-
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
+from core.db import get_db_session
+from models.lira_access import LiraAccess
+from models.nodes import Node, NodeType
+from models.nodes import Org, Dept, Func
 from shared.exceptions import AuthorizationError
 
 
@@ -66,61 +68,160 @@ def require_permission(permission: str):
         ctx_orgid: str,
         ctx_ndid: str,
         ctx_ndty: str,
-        current_user = Depends(get_current_user),
+        db: AsyncSession = Depends(get_db_session),
+        current_user=Depends(get_current_user),
     ):
         user_id = current_user["sub"]
-        print(f"Checking permission for user {user_id} on org={ctx_orgid}, node={ctx_ndty}#{ctx_ndid} for permission={permission}")
+        print(
+            f"Checking permission for user {user_id} "
+            f"on org={ctx_orgid}, node={ctx_ndty}#{ctx_ndid} "
+            f"for permission={permission}"
+        )
 
-        user_data = authorize_user(user_id, ctx_orgid, ctx_ndid, ctx_ndty)
+        user_data = authorize_user(
+            db,
+            user_id,
+            ctx_orgid,
+            ctx_ndid,
+            ctx_ndty,
+        )
 
-        role = user_data.get("role")
+        role_id = user_data["roleId"]
 
-        if not authorize_role_policies(ctx_orgid, ctx_ndid, ctx_ndty, role, permission):
+        if not authorize_role_policies(
+            ctx_orgid,
+            ctx_ndid,
+            ctx_ndty,
+            role_id,
+            permission,
+        ):
             raise AuthorizationError("Permission denied")
 
         return user_data
 
     return checker
 
+def validate_org_membership(
+    db: Session,
+    org_id: str,
+    node_id: str,
+    node_type: str,
+):
 
-def authorize_user(userId: str, orgid: str, ndid: str, ndty: str):
-    print(f"Authorizing user {userId} for org={orgid}, node={ndty}#{ndid}")
-    try:
-        response = userAccessTable.get_item(
-            Key={
-                "PK": f"USER#{userId}",
-                "SK": f"ORG#{orgid}#NODE#{ndty}#{ndid}"
-            },
-            ProjectionExpression="#rl, is_approved, itc",
-            ExpressionAttributeNames={"#rl": "role"}
+    if node_type == "ORG":
+        org = (
+            db.query(Org)
+            .filter(Org.node_id == node_id)
+            .first()
         )
 
-        item = response.get("Item")
+        if not org:
+            return False
 
-        if not item:
-            raise AuthorizationError("User not member of this node")
+        return str(org.node_id) == str(org_id)
 
 
-        if not item.get("is_approved"):
-            raise AuthorizationError("User not approved")
+    if node_type == "DEPT":
+        dept = (
+            db.query(Dept)
+            .filter(Dept.node_id == node_id)
+            .first()
+        )
 
-        if not item.get("role"):
-            raise AuthorizationError("User has no role assigned")
+        if not dept:
+            return False
+
+        return str(dept.parent_id) == str(org_id)
+
+    if node_type == "FUNC":
+        func = (
+            db.query(Func)
+            .filter(Func.node_id == node_id)
+            .first()
+        )
+
+        if not func:
+            return False
+
+        dept = (
+            db.query(Dept)
+            .filter(Dept.node_id == func.parent_id)
+            .first()
+        )
+
+        if not dept:
+            return False
+
+        return str(dept.parent_id) == str(org_id)
+
+    return False
+
+def authorize_user(
+    db: Session,
+    user_id: str,
+    org_id: str,
+    node_id: str,
+    node_type: str,
+):
+    print(
+        f"Authorizing user={user_id} "
+        f"org={org_id} node={node_id} type={node_type}"
+    )
+
+    try:
+        if not validate_org_membership(
+            db,
+            org_id,
+            node_id,
+            node_type,
+        ):
+            raise AuthorizationError(
+                "Node does not belong to org"
+            )
+
+        access = (
+            db.query(LiraAccess)
+            .join(Node, Node.id == LiraAccess.node_id)
+            .join(NodeType, NodeType.id == Node.node_type_id)
+            .filter(
+                LiraAccess.user_id == user_id,
+                LiraAccess.node_id == node_id,
+                NodeType.type == node_type,
+            )
+            .first()
+        )
+
+        if not access:
+            raise AuthorizationError(
+                "User not member of this node"
+            )
+
+        if not access.is_active:
+            raise AuthorizationError(
+                "User access is inactive"
+            )
+
+        if not access.is_approved:
+            raise AuthorizationError(
+                "User not approved"
+            )
 
         return {
-            "userId": userId,
-            "role": item["role"],
-            "itc": item.get("itc")
+            "userId": user_id,
+            "orgId": org_id,
+            "nodeId": node_id,
+            "roleId": access.role_id,
         }
 
-    except ClientError as e:
-        raise Exception(f"DynamoDB error: {e}")
+    except AuthorizationError:
+        raise
 
-
+    except Exception as e:
+        raise Exception(f"Database error: {str(e)}")
 
 # ROLE_CACHE = {}
 
-def authorize_role_policies(orgid: str, ndid: str, ndty: str, role: str, permission: str):
+def authorize_role_policies(orgid: str, ndid: str, ndty: str, role_id: str, permission: str):
     # cache_key = f"{orgid}#{role}"
 
     # if cache_key not in ROLE_CACHE:
@@ -137,7 +238,7 @@ def authorize_role_policies(orgid: str, ndid: str, ndty: str, role: str, permiss
     # if permission not in permissions:
     #     raise AuthorizationError("Permission denied")
     
-    if role and permission and orgid and ndid and ndty:
+    if role_id and permission and orgid and ndid and ndty:
         return True
     
     else:
@@ -146,20 +247,20 @@ def authorize_role_policies(orgid: str, ndid: str, ndty: str, role: str, permiss
 
 
 
-def get_role_permissions(orgid: str, role: str):
-    print(f"Fetching permissions for org={orgid}, role={role}")
+# def get_role_permissions(orgid: str, role_id: str):
+#     print(f"Fetching permissions for org={orgid}, role={role_id}")
 
-    response = role_policies_table.query(
-        KeyConditionExpression=Key("PK").eq(f"ORG#{orgid}") & Key("SK").eq(f"ROLE#{role}"),
-        ProjectionExpression="#perm",
-        ExpressionAttributeNames={"#perm": "permissions"}
-    )
+#     response = role_policies_table.query(
+#         KeyConditionExpression=Key("PK").eq(f"ORG#{orgid}") & Key("SK").eq(f"ROLE#{role_id}"),
+#         ProjectionExpression="#perm",
+#         ExpressionAttributeNames={"#perm": "permissions"}
+#     )
 
-    items = response.get("Items", [])
+#     items = response.get("Items", [])
 
-    if not items:
-        return []   
+#     if not items:
+#         return []   
 
-    permissions = items[0].get("permissions", [])
+#     permissions = items[0].get("permissions", [])
 
-    return permissions
+#     return permissions

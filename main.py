@@ -1,9 +1,11 @@
 from fastapi import FastAPI
 from shared.middleware import cors_middleware
-from sqlalchemy.ext.asyncio import AsyncEngine
-
 from core.db import Base, engine
 from create_departments.main import router as create_departments_router
+from create_organization.main import router as create_organization_router
+from create_functions.main import router as create_functions_router
+from create_category.main import router as create_category_router
+
 from health import router as health_router
 
 
@@ -20,10 +22,15 @@ def create_app() -> FastAPI:
     async def on_startup():
         await init_db()
 
-    app.include_router(create_departments_router, prefix="/create-departments")
-    app.include_router(health_router, prefix="/health")
+    app.include_router(create_departments_router, prefix="/create-departments", tags=["Department Management"])
+    app.include_router(create_organization_router, prefix="/create-organizations", tags=["Organization Management"])
+    app.include_router(create_functions_router, prefix="/create-functions", tags=["Function Management"])
+    app.include_router(create_category_router, prefix="/create-categories", tags=["Category Management"])
+    app.include_router(health_router, prefix="/health", tags=["Health Check"])
 
     return app
 
 
 app = create_app()
+app.title = "Lira API"
+app.version = "1.0.0"
