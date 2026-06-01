@@ -5,6 +5,9 @@ from create_departments.main import router as create_departments_router
 from create_organization.main import router as create_organization_router
 from create_functions.main import router as create_functions_router
 from create_category.main import router as create_category_router
+from get_all_categories.main import router as get_all_categories_router
+from get_all_courses.main import router as get_all_courses_router
+from create_course.main import router as create_course_router
 
 from health import router as health_router
 
@@ -26,6 +29,9 @@ def create_app() -> FastAPI:
     app.include_router(create_organization_router, prefix="/create-organizations", tags=["Organization Management"])
     app.include_router(create_functions_router, prefix="/create-functions", tags=["Function Management"])
     app.include_router(create_category_router, prefix="/create-categories", tags=["Category Management"])
+    app.include_router(get_all_categories_router, prefix="/get-all-categories", tags=["Category Management"])
+    app.include_router(get_all_courses_router, prefix="/get-all-courses", tags=["Course Management"])
+    app.include_router(create_course_router, prefix="/create-course", tags=["Course Management"])
     app.include_router(health_router, prefix="/health", tags=["Health Check"])
 
     return app

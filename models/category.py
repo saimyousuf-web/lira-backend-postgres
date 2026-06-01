@@ -6,7 +6,7 @@ from core.db import Base
 
 
 class Category(Base):
-    __tablename__ = "category"
+    __tablename__ = "categories"
 
     id = Column(
         UUID(as_uuid=True),
@@ -14,35 +14,35 @@ class Category(Base):
         default=uuid.uuid4,
     )
 
-    name = Column(
+    nm = Column(
         String(255),
         nullable=False,
     )
 
-    description = Column(
+    dec = Column(
         Text,
         nullable=True,
     )
 
-    created_at = Column(
+    crtat = Column(
         DateTime(timezone=True),
         nullable=False,
         server_default=func.now(),
     )
 
-    updated_at = Column(
+    updat = Column(
         DateTime(timezone=True),
         nullable=False,
         server_default=func.now(),
         onupdate=func.now(),
     )
 
-    created_by = Column(
+    crtby = Column(
         UUID(as_uuid=True),
         nullable=True,
     )
 
-    updated_by = Column(
+    updby = Column(
         UUID(as_uuid=True),
         nullable=True,
     )

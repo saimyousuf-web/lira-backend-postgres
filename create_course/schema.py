@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
 
-class CreateCategoryRequest(BaseModel):
+class CreateCourseRequest(BaseModel):
     name: str
     description: str = Field(default="")
