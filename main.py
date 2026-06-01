@@ -5,6 +5,8 @@ from create_departments.main import router as create_departments_router
 from create_organization.main import router as create_organization_router
 from create_functions.main import router as create_functions_router
 from create_category.main import router as create_category_router
+from get_user_org_access_details.main import router as get_user_org_access_details_router
+from register_learner_router.main import router as register_learner_router
 from get_all_categories.main import router as get_all_categories_router
 from get_all_courses.main import router as get_all_courses_router
 from create_course.main import router as create_course_router
@@ -24,6 +26,11 @@ def create_app() -> FastAPI:
     @app.on_event("startup")
     async def on_startup():
         await init_db()
+
+    #auth apis
+    app.include_router(get_user_org_access_details_router, prefix="/get-user-org-access-details")
+    app.include_router(register_learner_router, prefix="/register-learner")
+
 
     app.include_router(create_departments_router, prefix="/create-departments", tags=["Department Management"])
     app.include_router(create_organization_router, prefix="/create-organizations", tags=["Organization Management"])

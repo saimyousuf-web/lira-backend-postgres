@@ -7,8 +7,11 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         extra="ignore"
     )
+    # --- AWS Config ---
     REGION: str
+    # --- Postgresql Config ---
     DATABASE_URL: str
+     # --- Cognito ---
     COGNITO_USER_POOL_ID: str
     COGNITO_CLIENT_ID: str
     DISABLE_EMAILS: bool

@@ -1,6 +1,7 @@
-from sqlalchemy import Column, String, Boolean, ForeignKey, DateTime, UniqueConstraint, func
+from sqlalchemy import Column, Boolean, ForeignKey, DateTime, UniqueConstraint, func
 from sqlalchemy.orm import relationship
 from core.db import Base
+from sqlalchemy.dialects.postgresql import UUID
 
 class LiraAccess(Base):
     __tablename__ = "lira_access"
