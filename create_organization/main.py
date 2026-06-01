@@ -19,7 +19,7 @@ async def create_organization(
     # auth_data=Depends(require_permission("create_organization")),
     db: AsyncSession = Depends(get_db_session),
 ):
-    user_id = uuid.UUID("00000000-0000-0000-0000-000000000001")  # placeholder for testing
+    user_id = uuid.UUID("6418e458-50a1-70fe-9d3e-b52f5d2df57c")  # placeholder for testing
     # user_id = uuid.UUID(auth_data["userId"])
     
 
