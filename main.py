@@ -8,8 +8,9 @@ from create_category.main import router as create_category_router
 from get_user_org_access_details.main import router as get_user_org_access_details_router
 from register_learner_router.main import router as register_learner_router
 from health import router as health_router
-
-
+from get_all_organization.main import router as get_all_organization_router
+from get_all_departments_by_org.main import router as get_all_departments_by_org_router
+from get_all_functions_by_dept.main import router as get_all_functions_by_dept_router
 async def init_db():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
@@ -26,7 +27,9 @@ def create_app() -> FastAPI:
     #auth apis
     app.include_router(get_user_org_access_details_router, prefix="/get-user-org-access-details")
     app.include_router(register_learner_router, prefix="/register-learner")
-
+    app.include_router(get_all_organization_router,prefix="/get-all-organization")
+    app.include_router(get_all_departments_by_org_router, prefix="/get-all-departments-by-org")
+    app.include_router(get_all_functions_by_dept_router, prefix="/get-all-functions-by-dept")
 
     app.include_router(create_departments_router, prefix="/create-departments", tags=["Department Management"])
     app.include_router(create_organization_router, prefix="/create-organizations", tags=["Organization Management"])

@@ -12,7 +12,6 @@ from core.db import get_db_session
 from auth.cognito import find_user
 from models.user import User
 
-
 router = APIRouter()
 
 cognito = boto3.client("cognito-idp", region_name=settings.REGION)
