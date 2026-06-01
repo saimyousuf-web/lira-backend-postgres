@@ -1,0 +1,78 @@
+import uuid
+from auth.main import get_current_user
+from models.lira_access import LiraAccess
+from models.nodes import Org
+from models.user import User
+from models.permissions import Permission
+from models.role_permissions import RolePermission
+from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import APIRouter, HTTPException, Depends
+from core.db import get_db_session
+from sqlalchemy import select
+
+router = APIRouter()
+
+
+@router.get("")
+async def get_user_details(
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db_session)
+):
+    user_id = uuid.UUID(user.get("sub"))
+
+    try:
+        user_row = await db.scalar(select(User).where(User.id == user_id))
+
+        if not user_row:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        user_name = user_row.first_name
+        user_email = user_row.email
+
+        response = await db.execute(
+            select(LiraAccess).where(LiraAccess.user_id == user_id)
+        )
+        items = response.scalars().all()
+
+        role_ids = list({item.role_id for item in items if item.role_id})
+
+        permission_names = []
+        if role_ids:
+            permission_response = await db.execute(
+                select(Permission)
+                .join(RolePermission, Permission.id == RolePermission.permission_id)
+                .where(RolePermission.role_id.in_(role_ids))
+            )
+            permissions = permission_response.scalars().all()
+            permission_names = [p.name for p in permissions]
+
+        org_response = await db.execute(
+            select(Org)
+            .join(LiraAccess, Org.node_id == LiraAccess.node_id)
+            .where(LiraAccess.user_id == user_id)
+        )
+        orgs = org_response.scalars().all()
+
+        result = []
+
+        for org in orgs:
+            result.append({
+                "userId": user_id,
+                "name": user_name,
+                "user_email": user_email,
+                "orgid": org.org_id,
+                "ndid": org.node_id,
+                "ndty": "ORG",
+                "ndname": org.name,
+                "prtndid": org.parent_id or "ROOT",
+                "role": "ADMIN",
+                "permissions": permission_names
+            })
+
+        print("API HIT", result)
+        return result
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"server error: {e}")
