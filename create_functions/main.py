@@ -21,7 +21,7 @@ async def create_functions(
     # auth_data = Depends(require_permission("create_function")),
     db: AsyncSession = Depends(get_db_session),
 ):
-    user_id = uuid.UUID("00000000-0000-0000-0000-000000000001")
+    user_id = uuid.UUID("6418e458-50a1-70fe-9d3e-b52f5d2df57c")  # placeholder for testing
     org_id = uuid.UUID(ctx_orgid)
     parent_dept_id = uuid.UUID(payload.department_id)
 

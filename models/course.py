@@ -16,10 +16,10 @@ from core.db import Base
 
 
 class Course(Base):
-    __tablename__ = "course"
+    __tablename__ = "courses"
 
     __table_args__ = (
-        Index("idx_courses_status", "status"),
+        # Index("idx_courses_status", "status"),
         CheckConstraint(
             "status IN ('DRAFT', 'PUBLISHED', 'RETIRED')",
             name="ck_course_status",
@@ -32,17 +32,17 @@ class Course(Base):
         default=uuid.uuid4,
     )
 
-    name = Column(
+    nm = Column(
         String(255),
         nullable=False,
     )
 
-    description = Column(
+    dec = Column(
         Text,
         nullable=True,
     )
 
-    status = Column(
+    sts = Column(
         String(50),
         nullable=False,
         server_default="DRAFT",
@@ -54,25 +54,25 @@ class Course(Base):
         server_default="0",
     )
 
-    created_at = Column(
+    crtat = Column(
         DateTime(timezone=True),
         nullable=False,
         server_default=func.now(),
     )
 
-    updated_at = Column(
+    updat = Column(
         DateTime(timezone=True),
         nullable=False,
         server_default=func.now(),
         onupdate=func.now(),
     )
 
-    created_by = Column(
+    crtby = Column(
         UUID(as_uuid=True),
         nullable=True,
     )
 
-    updated_by = Column(
+    updby = Column(
         UUID(as_uuid=True),
         nullable=True,
     )

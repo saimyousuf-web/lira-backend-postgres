@@ -9,23 +9,23 @@ from sqlalchemy.sql import func
 from core.db import Base
 
 
-class CatCourse(Base):
-    __tablename__ = "cat_course"
+class CourseNode(Base):
+    __tablename__ = "course_node"
 
     __table_args__ = (
-        Index("idx_cat_course_course", "cid"),
-        Index("idx_cat_course_category", "catid"),
-    )
-
-    catid = Column(
-        UUID(as_uuid=True),
-        ForeignKey("category.id", ondelete="CASCADE"),
-        primary_key=True,
+        Index("idx_course_node_node", "ndid"),
+        Index("idx_course_node_course", "cid"),
     )
 
     cid = Column(
         UUID(as_uuid=True),
-        ForeignKey("course.id", ondelete="CASCADE"),
+        ForeignKey("courses.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+
+    ndid = Column(
+        UUID(as_uuid=True),
+        ForeignKey("nodes.id", ondelete="CASCADE"),
         primary_key=True,
     )
 

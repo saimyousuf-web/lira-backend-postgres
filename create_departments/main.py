@@ -34,7 +34,7 @@ async def create_departments(
         )
 
     # user_id = uuid.UUID(auth_data["userId"])
-    user_id = uuid.UUID("00000000-0000-0000-0000-000000000001")
+    user_id = uuid.UUID("6418e458-50a1-70fe-9d3e-b52f5d2df57c")  # placeholder for testing
 
     try:
         parent_node_id = uuid.UUID(ctx_ndid)
