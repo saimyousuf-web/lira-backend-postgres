@@ -13,17 +13,17 @@ from get_all_functions_by_dept.schema import (
 router = APIRouter()
 
 
-@router.get("/{org_id}/{dept_id}", response_model=GetAllFunctionsByDeptResponse)
+@router.get("/{orgid}/{dept_id}", response_model=GetAllFunctionsByDeptResponse)
 async def get_all_functions_by_dept(
-    org_id: UUID,
+    orgid : UUID,
     dept_id: UUID,
     db: AsyncSession = Depends(get_db_session),
 ):
     result = await db.execute(
         select(Func).where(
-            Func.org_id == org_id,
-            Func.parent_id == dept_id,
-            Func.is_active == True,  # or .is_(True)
+            Func.orgid  == orgid,
+            Func.prtndid == dept_id,
+            Func.isact == True, 
         )
     )
     funcs = result.scalars().all()
@@ -33,9 +33,9 @@ async def get_all_functions_by_dept(
         success=True,
         functions=[
             FunctionResponse(
-                ndid=func.node_id,
-                prtndid=func.parent_id,
-                name=func.name,
+                ndid=func.ndid,
+                prtndid=func.prtndid,
+                name=func.nm,
             )
             for func in funcs
         ],

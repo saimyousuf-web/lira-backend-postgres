@@ -10,10 +10,10 @@ from get_all_departments_by_org.schema import DepartmentResponse, GetAllDepartme
 router = APIRouter()
 
 
-@router.get("/{org_id}", response_model=GetAllDepartmentsByOrgResponse)
-async def get_all_departments_by_org(org_id: UUID,db: AsyncSession = Depends(get_db_session)):
+@router.get("/{orgid}", response_model=GetAllDepartmentsByOrgResponse)
+async def get_all_departments_by_org(orgid: UUID,db: AsyncSession = Depends(get_db_session)):
     result = await db.execute(
-        select(Dept).where(Dept.org_id == org_id)
+        select(Dept).where(Dept.orgid == orgid)
     )
     depts = result.scalars().all()
 
@@ -23,9 +23,9 @@ async def get_all_departments_by_org(org_id: UUID,db: AsyncSession = Depends(get
         success=True,
         departments=[
             DepartmentResponse(
-                ndid=dept.node_id,
-                prtndid=dept.parent_id,
-                name=dept.name
+                ndid=dept.ndid,
+                prtndid=dept.prtndid,
+                name=dept.nm
             )
             for dept in depts
         ]

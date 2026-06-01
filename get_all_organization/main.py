@@ -16,8 +16,8 @@ async def get_organizations(db: AsyncSession = Depends(get_db_session)):
 
     organizations = [
         Organization(
-            name=org.name,
-            ndid=org.node_id
+            name=org.nm,
+            ndid=org.ndid
         )
         for org in orgs
     ]
