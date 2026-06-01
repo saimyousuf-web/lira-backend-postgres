@@ -41,8 +41,8 @@ async def create_departments(
 
         org = await db.scalar(
             select(Org).where(
-                Org.node_id == parent_node_id,
-                Org.is_active == True,
+                Org.ndid == parent_node_id,
+                Org.isact == True,
             )
         )
 
@@ -53,7 +53,7 @@ async def create_departments(
             )
 
         dept_type = await db.scalar(
-            select(NodeType).where(NodeType.type == "DEPT")
+            select(NodeType).where(NodeType.ty == "DEPT")
         )
 
         if not dept_type:
@@ -73,13 +73,13 @@ async def create_departments(
             await db.flush() 
 
             dept = Dept(
-                node_id=node.id,
-                org_id=org.node_id,
-                parent_id=parent_node_id,  ## same as org.node_id 
-                name=name.strip(),
-                is_active=True,
-                created_by=user_id,
-                updated_by=user_id,
+                ndid=node.id,
+                orgid=org.ndid,
+                prtndid=parent_node_id,  ## same as org.node_id 
+                nm=name.strip(),
+                isact=True,
+                crtby=user_id,
+                updby=user_id,
             )
             db.add(dept)
 

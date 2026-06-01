@@ -22,10 +22,10 @@ async def create_category(
     # user_id = uuid.UUID(auth_data["userId"])
     try:
         category = Category(
-            name=payload.name.strip(),
-            description=payload.description,
-            created_by=user_id,
-            updated_by=user_id,
+            nm=payload.name.strip(),
+            dsc=payload.description,
+            crtby=user_id,
+            updby=user_id,
         )       
         db.add(category)
         
@@ -43,6 +43,7 @@ async def create_category(
         "message": "Category created successfully",
         "data": {
             "category_id": str(category.id),
-            "name": category.name,
+            "name": category.nm,
+            "description": category.dsc,
         }
     }

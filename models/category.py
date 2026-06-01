@@ -19,7 +19,7 @@ class Category(Base):
         nullable=False,
     )
 
-    dec = Column(
+    dsc = Column(
         Text,
         nullable=True,
     )

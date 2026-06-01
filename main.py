@@ -35,7 +35,7 @@ def create_app() -> FastAPI:
     app.include_router(create_departments_router, prefix="/create-departments", tags=["Department Management"])
     app.include_router(create_organization_router, prefix="/create-organizations", tags=["Organization Management"])
     app.include_router(create_functions_router, prefix="/create-functions", tags=["Function Management"])
-    app.include_router(create_category_router, prefix="/create-categories", tags=["Category Management"])
+    app.include_router(create_category_router, prefix="/create-category", tags=["Category Management"])
     app.include_router(get_all_categories_router, prefix="/get-all-categories", tags=["Category Management"])
     app.include_router(get_all_courses_router, prefix="/get-all-courses", tags=["Course Management"])
     app.include_router(create_course_router, prefix="/create-course", tags=["Course Management"])

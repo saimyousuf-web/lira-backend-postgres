@@ -37,7 +37,7 @@ class Course(Base):
         nullable=False,
     )
 
-    dec = Column(
+    dsc = Column(
         Text,
         nullable=True,
     )

@@ -23,10 +23,10 @@ async def get_all_courses(
 
         stmt = (
             select(
-                Course.id.label("cid"),
-                Course.name.label("cnm"),
-                Course.description.label("dec"),
-                Course.created_at.label("crtat"),
+                Course.id.label("id"),
+                Course.nm.label("nm"),
+                Course.dsc.label("dsc"),
+                Course.crtat.label("crtat"),
             )
             .join(CourseNode, CourseNode.cid == Course.id)
             .where(CourseNode.ndid == node_id)
@@ -36,11 +36,17 @@ async def get_all_courses(
         result = await db.execute(stmt)
         courses = result.mappings().all()
 
-        return {
-            "status": "success",
-            "status_code": 200,
-            "data": [dict(course) for course in courses],
-        }
+        items = [
+            {
+                "cid": course["id"],
+                "cnm": course["nm"],
+                "desc": course["dsc"],
+                "crtat": course["crtat"],
+            }
+            for course in courses
+        ]
+
+        return items
 
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid node id")

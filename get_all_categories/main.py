@@ -1,44 +1,41 @@
 from fastapi import APIRouter, HTTPException, Depends, Path
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from dependencies.auth import require_permission
+
 from core.db import get_db_session
-from models.category import Category  # adjust import to your actual model path
+from models.category import Category
 
 router = APIRouter()
-
 
 @router.get("/{ctx_orgid}/{ctx_ndid}/{ctx_ndty}")
 async def get_all_categories(
     ctx_orgid: str = Path(...),
     ctx_ndid: str = Path(...),
     ctx_ndty: str = Path(...),
-    # user=Depends(require_permission('get_all_categories')),
-    db: Session = Depends(get_db_session),
+    db: AsyncSession = Depends(get_db_session),
 ):
-
     try:
         stmt = (
             select(
-                Category.catid,
-                Category.catnm,
-                Category.desc,
+                Category.id,
+                Category.nm,
+                Category.dsc,
                 Category.crtat,
             )
-            .where(Category.orgid == ctx_orgid)
             .order_by(Category.crtat.desc())
         )
 
-        result = db.execute(stmt).all()
+        result = await db.execute(stmt)
+        rows = result.all()
 
         items = [
             {
-                "catid": row.catid,
-                "catnm": row.catnm,
-                "desc": row.desc,
+                "catid": row.id,
+                "catnm": row.nm,
+                "desc": row.dsc,
                 "crtat": row.crtat,
             }
-            for row in result
+            for row in rows
         ]
 
         return items

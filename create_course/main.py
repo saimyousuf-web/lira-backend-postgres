@@ -30,7 +30,7 @@ async def create_course(
             .join(Node.node_type)
             .where(
                 Node.id == node_id,
-                NodeType.type == ctx_ndty,
+                NodeType.ty == ctx_ndty,
             )
         )
         result = await db.execute(stmt)
@@ -40,10 +40,10 @@ async def create_course(
             raise HTTPException(status_code=404, detail="Node not found")
 
         course = Course(
-            name=payload.name.strip(),
-            description=payload.description,
-            created_by=user_id,
-            updated_by=user_id,
+            nm=payload.name.strip(),
+            dsc=payload.description,
+            crtby=user_id,
+            updby=user_id,
         )
 
         db.add(course)
@@ -66,7 +66,8 @@ async def create_course(
             "message": "Course created successfully",
             "data": {
                 "course_id": str(course.id),
-                "name": course.name,
+                "name": course.nm,
+                "description": course.dsc,
                 "node_id": str(node.id),
             },
         }
