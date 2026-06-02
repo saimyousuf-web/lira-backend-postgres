@@ -48,7 +48,7 @@ class Dept(Base):
     )
 
     ndid    = Column(UUID(as_uuid=True), ForeignKey("nodes.id", ondelete="CASCADE"), primary_key=True)
-    orgid     = Column(UUID(as_uuid=True), ForeignKey("orgs.node_id"), nullable=False)
+    orgid     = Column(UUID(as_uuid=True), ForeignKey("orgs.ndid"), nullable=False)
     prtndid  = Column(UUID(as_uuid=True), ForeignKey("nodes.id"), nullable=False)
     nm       = Column(String(255), nullable=False)
     isact  = Column(Boolean, nullable=False, default=True)
@@ -65,7 +65,7 @@ class Func(Base):
     )
 
     ndid    = Column(UUID(as_uuid=True), ForeignKey("nodes.id", ondelete="CASCADE"), primary_key=True)
-    orgid     = Column(UUID(as_uuid=True), ForeignKey("orgs.node_id"), nullable=False)
+    orgid     = Column(UUID(as_uuid=True), ForeignKey("orgs.ndid"), nullable=False)
     prtndid  = Column(UUID(as_uuid=True), ForeignKey("nodes.id"), nullable=False)
     nm       = Column(String(255), nullable=False)
     isact  = Column(Boolean, nullable=False, default=True)

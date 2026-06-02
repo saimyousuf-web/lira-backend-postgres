@@ -66,7 +66,7 @@ async def create_departments(
 
         for name in payload.names:
             node = Node(
-                node_type_id=dept_type.id,
+                ndtyid=dept_type.id,
             )
 
             db.add(node)
@@ -112,7 +112,7 @@ async def create_departments(
         message="All departments created successfully",
         data=[
             {
-                "name": dept.name,
+                "name": dept.nm,
                 "success": True,
             }
             for dept in new_depts
