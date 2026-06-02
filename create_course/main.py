@@ -27,7 +27,7 @@ async def create_course(
 
         stmt = (
             select(Node)
-            .join(Node.node_type)
+            .join(Node.ndty)
             .where(
                 Node.id == node_id,
                 NodeType.ty == ctx_ndty,
@@ -50,10 +50,10 @@ async def create_course(
         await db.flush()  # generates course.id
 
         course_node = CourseNode(
-            course_id=course.id,
-            node_id=node.id,
-            created_by=user_id,
-            updated_by=user_id,
+            cid=course.id,
+            ndid=node.id,
+            crtby=user_id,
+            updby=user_id,
         )
 
         db.add(course_node)
@@ -63,13 +63,7 @@ async def create_course(
         return {
             "status": "success",
             "status_code": 201,
-            "message": "Course created successfully",
-            "data": {
-                "course_id": str(course.id),
-                "name": course.nm,
-                "description": course.dsc,
-                "node_id": str(node.id),
-            },
+            "message": "Course created successfully"
         }
 
     except ValueError:

@@ -43,8 +43,8 @@ async def create_functions(
         # Optional: keep this if you want explicit org existence validation
         org = await db.scalar(
             select(Org).where(
-                Org.node_id == org_id,
-                Org.is_active == True,
+                Org.ndid == org_id,
+                Org.isact == True,
             )
         )
         if not org:
