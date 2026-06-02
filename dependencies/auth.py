@@ -181,11 +181,11 @@ def authorize_user(
 
         access = (
             db.query(LiraAccess)
-            .join(Node, Node.id == LiraAccess.node_id)
+            .join(Node, Node.id == LiraAccess.ndid)
             .join(NodeType, NodeType.id == Node.node_type_id)
             .filter(
-                LiraAccess.user_id == user_id,
-                LiraAccess.node_id == node_id,
+                LiraAccess.uid == user_id,
+                LiraAccess.ndid == node_id,
                 NodeType.type == node_type,
             )
             .first()
@@ -210,7 +210,7 @@ def authorize_user(
             "userId": user_id,
             "orgId": org_id,
             "nodeId": node_id,
-            "roleId": access.role_id,
+            "roleId": access.rlid,
         }
 
     except AuthorizationError:

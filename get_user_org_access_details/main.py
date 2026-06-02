@@ -1,14 +1,15 @@
 import uuid
+from xml.dom import Node
 from auth.main import get_current_user
 from models.lira_access import LiraAccess
-from models.nodes import Org
+from models.nodes import Dept, Func, NodeType, Org
 from models.user import User
 from models.permissions import Permission
 from models.role_permissions import RolePermission
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import APIRouter, HTTPException, Depends
 from core.db import get_db_session
-from sqlalchemy import select
+from sqlalchemy import select,union
 
 router = APIRouter()
 
@@ -21,7 +22,9 @@ async def get_user_details(
     user_id = uuid.UUID(user.get("sub"))
 
     try:
-        user_row = await db.scalar(select(User).where(User.id == user_id))
+        user_row = await db.scalar(
+            select(User).where(User.id == user_id)
+        )
 
         if not user_row:
             raise HTTPException(status_code=404, detail="User not found")
@@ -29,12 +32,15 @@ async def get_user_details(
         user_name = user_row.first_name
         user_email = user_row.email
 
-        response = await db.execute(
-            select(LiraAccess).where(LiraAccess.user_id == user_id)
+        access_response = await db.execute(
+            select(LiraAccess).where(LiraAccess.uid == user_id)
         )
-        items = response.scalars().all()
+        access_items = access_response.scalars().all()
 
-        role_ids = list({item.role_id for item in items if item.role_id})
+        if not access_items:
+            return []
+
+        role_ids = list({item.rlid for item in access_items if item.rlid})
 
         permission_names = []
         if role_ids:
@@ -46,30 +52,50 @@ async def get_user_details(
             permissions = permission_response.scalars().all()
             permission_names = [p.name for p in permissions]
 
-        org_response = await db.execute(
-            select(Org)
-            .join(LiraAccess, Org.node_id == LiraAccess.node_id)
-            .where(LiraAccess.user_id == user_id)
-        )
-        orgs = org_response.scalars().all()
+        org_query = union(
+            # direct org access
+            select(Org.ndid.label("org_ndid"), Org.nm.label("org_name"), Org.prtndid.label("prtndid"))
+            .join(LiraAccess, LiraAccess.ndid == Org.ndid)
+            .where(LiraAccess.uid == user_id),
+
+            # dept access -> org
+            select(Org.ndid.label("org_ndid"), Org.nm.label("org_name"), Org.prtndid.label("prtndid"))
+            .join(Dept, Dept.orgid == Org.ndid)
+            .join(LiraAccess, LiraAccess.ndid == Dept.ndid)
+            .where(LiraAccess.uid == user_id),
+
+            # func access -> org
+            select(Org.ndid.label("org_ndid"), Org.nm.label("org_name"), Org.prtndid.label("prtndid"))
+            .join(Func, Func.orgid == Org.ndid)
+            .join(LiraAccess, LiraAccess.ndid == Func.ndid)
+            .where(LiraAccess.uid == user_id),
+        ).subquery()
+
+        org_response = await db.execute(select(org_query))
+        org_rows = org_response.all()
 
         result = []
+        seen_orgs = set()
 
-        for org in orgs:
+        for row in org_rows:
+            orgid = row.org_ndid
+            if orgid in seen_orgs:
+                continue
+            seen_orgs.add(orgid)
+
             result.append({
-                "userId": user_id,
+                "userId": str(user_id),
                 "name": user_name,
                 "user_email": user_email,
-                "orgid": org.org_id,
-                "ndid": org.node_id,
+                "orgid": str(orgid),
+                "ndid": str(orgid),
                 "ndty": "ORG",
-                "ndname": org.name,
-                "prtndid": org.parent_id or "ROOT",
+                "ndname": row.org_name,
+                "prtndid": str(row.prtndid) if row.prtndid else "ROOT",
                 "role": "ADMIN",
                 "permissions": permission_names
             })
 
-        print("API HIT", result)
         return result
 
     except HTTPException:
