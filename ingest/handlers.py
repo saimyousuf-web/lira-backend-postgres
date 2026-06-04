@@ -4,13 +4,9 @@ import select
 import boto3
 from datetime import datetime
 from fastapi import HTTPException
-from botocore.exceptions import ClientError
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from core.db import get_db_session
+from sqlalchemy import select
 from core.config import settings
-
-
 from models.module import Module
 from models.course_module import CourseModule
 
@@ -45,11 +41,11 @@ async def process_document(
             module = Module(
                 id=module_id,
                 nm=file_name,
-                typ=file_type,
+                ty=file_type,
                 loc=s3_key,
-                is_apprvd=approval_sts,
-                sts="DRAFT",
-                is_vectrzd=False,
+                isapr=approval_sts,
+                sts="PENDING",
+                isvec=False,
                 crtby=userId,
                 updby=userId,
             )
@@ -63,29 +59,30 @@ async def process_document(
             module.updat = datetime.utcnow()
 
         # 2) Create course-module mapping
-        existing_link = (
-            db.query(CourseModule)
-            .filter(
+
+        result = await db.execute(
+            select(CourseModule).where(
                 CourseModule.cid == course_id,
                 CourseModule.moid == module_id,
             )
-            .first()
         )
 
+        existing_link = result.scalar_one_or_none()
+
         if not existing_link:
-            db.add(
+                db.add(
                 CourseModule(
-                    course_id=course_id,
-                    module_id=module_id,
+                    cid=course_id,
+                    moid=module_id,
                     crtby=userId,
                     updby=userId,
                 )
             )
 
-        db.commit()
+        await db.commit()
 
     except Exception as e:
-        db.rollback()
+        await db.rollback()
         raise HTTPException(status_code=500, detail=f"Postgres error: {str(e)}")
 
     safe_doc_id = re.sub(r"[^A-Za-z0-9_-]", "-", str(module_id))

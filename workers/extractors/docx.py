@@ -10,12 +10,11 @@ from docx import Document as DocxDocument
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-from fastapi import APIRouter, Body, HTTPException, Depends, Path
+from fastapi import APIRouter, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy import select
 
-from core.db import get_db_session
 from models.chunks import Chunk
 from models.module import Module
 from models.course_module import CourseModule
@@ -96,7 +95,7 @@ def _build_chunks(docx_json: dict) -> list[dict]:
     ]
 
 
-def _embed_and_upsert_pinecone(
+def _embed_and_upsert_qdrant(
     chunk_id: uuid.UUID,
     text: str,
     organization_id: str,
@@ -105,7 +104,7 @@ def _embed_and_upsert_pinecone(
     module_id: uuid.UUID,
 ) -> tuple[str, int]:
     """
-    Embed a single chunk with Amazon Titan and upsert into Pinecone.
+    Embed a single chunk with Amazon Titan and upsert into Qdrant.
     Returns (embedding_status, embedding_dim).
     """
     try:
@@ -119,14 +118,13 @@ def _embed_and_upsert_pinecone(
 
         if not (isinstance(embedding, list) and len(embedding) == 1024):
             return "failed", 0
-
+        print(get_qdrant_client().collection_exists(QDRANT_COLLECTION))
         normalized = normalize_vector(embedding)
-        
         get_qdrant_client().upsert(
         collection_name=QDRANT_COLLECTION,
         points=[
         PointStruct(
-            id=str(chunk_id),          # UUID string — Qdrant accepts these
+            id=str(chunk_id),     
             vector=normalized,
             payload={
                 "chunk_id":       str(chunk_id),
@@ -162,8 +160,8 @@ async def chunk_and_embed_docx(
     user_id = uuid.UUID("6418e458-50a1-70fe-9d3e-b52f5d2df57c")
 
     try:
-        course_id = uuid.UUID(ctx_cid)
-        module_id = uuid.UUID(ctx_moid)
+        course_id = ctx_cid
+        module_id = ctx_moid
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid UUID format in path")
 
@@ -208,7 +206,7 @@ async def chunk_and_embed_docx(
         chunk_id: uuid.UUID = chunk_data["chunk_id"]
         text: str = chunk_data["text"]
 
-        embedding_status, _ = _embed_and_upsert_pinecone(
+        embedding_status, _ = _embed_and_upsert_qdrant(
             chunk_id=chunk_id,
             text=text,
             organization_id=ctx_orgid,
@@ -218,6 +216,7 @@ async def chunk_and_embed_docx(
         )
 
         if embedding_status == "failed":
+            print(embedding_status, 'embedding_statusembedding_statusembedding_status')
             print(f"Skipping DB insert for chunk {chunk_id} due to embedding failure")
             continue
 
@@ -236,7 +235,7 @@ async def chunk_and_embed_docx(
     now = datetime.now(timezone.utc)
 
     module.isvec = True
-    module.sts = "processed"
+    module.sts = "APPROVED"
     module.updat = now
     module.updby = user_id
 

@@ -3,10 +3,10 @@ import os
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams, PointStruct
 import numpy as np
-
-QDRANT_URL        = os.environ.get("QDRANT_URL")      
-QDRANT_API_KEY    = os.environ.get("QDRANT_API_KEY")   
-QDRANT_COLLECTION = os.environ.get("QDRANT_COLLECTION", "lira_vector")
+from core.config import settings
+QDRANT_URL        = settings.QDRANT_URL     
+QDRANT_API_KEY    = settings.QDRANT_API_KEY   
+QDRANT_COLLECTION = settings.QDRANT_COLLECTION
 VECTOR_DIM        = 1024  
 
 # Singleton client

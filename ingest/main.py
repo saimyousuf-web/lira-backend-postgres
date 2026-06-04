@@ -23,7 +23,7 @@ async def process_uploaded_file(
         organization_id=uuid.UUID("476a5b85-3c35-4c05-8647-2dd79babd835"),
         course_id=uuid.UUID("1dc223b7-ee5e-4f83-9cd6-03c4bf9a9c13"),
         module_id=uuid.UUID(module_id),
-        s3_key="be7401db-7bcb-40ce-97ab-07a8eb7b6c58/18603901-92d6-45f1-9b96-860b8717a774/20260318T063031_1 APM_Product_Security_Engineering_Manual_Extended.docx",
+        s3_key="476a5b85-3c35-4c05-8647-2dd79babd835/1dc223b7-ee5e-4f83-9cd6-03c4bf9a9c13/20260604T052941_lira_schema.docx",
         file_name="1 APM_Product_Security_Engineering_Manual_Extended.docx",
         file_type="docx",
         course_name="APM Product Security Engineering Manual",

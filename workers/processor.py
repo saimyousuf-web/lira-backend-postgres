@@ -2,9 +2,9 @@ from workers.extractors.docx import chunk_and_embed_docx
 from workers.extractors.pdf import  chunk_and_embed_pdf
 import os
 import boto3
-
-S3_BUCKET = os.environ.get("S3_BUCKET_NAME")
-REGION = os.environ.get("REGION")
+from core.config import settings
+S3_BUCKET = settings.S3_BUCKET_NAME
+REGION = settings.REGION
 s3_client = boto3.client("s3", region_name=REGION)
 
 
