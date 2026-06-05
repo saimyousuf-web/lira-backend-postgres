@@ -10,7 +10,10 @@ from register_learner_router.main import router as register_learner_router
 from get_all_categories.main import router as get_all_categories_router
 from get_all_courses.main import router as get_all_courses_router
 from create_course.main import router as create_course_router
-
+from get_category_by_cid.main import router as get_category_by_cid_router
+from get_chat_history.main import router as get_chat_history_router
+from get_logo.main import router as get_org_logo_router
+from get_user_current_info.main import router as get_user_current_info_router
 from health import router as health_router
 from get_all_organization.main import router as get_all_organization_router
 from get_all_departments_by_org.main import router as get_all_departments_by_org_router
@@ -29,19 +32,33 @@ def create_app() -> FastAPI:
         await init_db()
 
     #auth apis
-    app.include_router(get_user_org_access_details_router, prefix="/get-user-org-access-details")
-    app.include_router(register_learner_router, prefix="/register-learner")
-    app.include_router(get_all_organization_router,prefix="/get-all-organization")
-    app.include_router(get_all_departments_by_org_router, prefix="/get-all-departments-by-org")
-    app.include_router(get_all_functions_by_dept_router, prefix="/get-all-functions-by-dept")
+    app.include_router(get_user_org_access_details_router, prefix="/get-user-org-access-details",tags=["Authentication APIs"])
+    app.include_router(register_learner_router, prefix="/register-learner",tags=["Authentication APIs"])
+    app.include_router(get_all_organization_router,prefix="/get-all-organization",tags=["Authentication APIs"])
+    app.include_router(get_all_departments_by_org_router, prefix="/get-all-departments-by-org",tags=["Authentication APIs"])
+    app.include_router(get_all_functions_by_dept_router, prefix="/get-all-functions-by-dept",tags=["Authentication APIs"])
+    app.include_router(get_user_current_info_router, prefix="/get-user-current-info",tags=["Authentication APIs"])
+
 
     app.include_router(create_departments_router, prefix="/create-departments", tags=["Department Management"])
     app.include_router(create_organization_router, prefix="/create-organizations", tags=["Organization Management"])
     app.include_router(create_functions_router, prefix="/create-functions", tags=["Function Management"])
+    
+    # Category Management
     app.include_router(create_category_router, prefix="/create-category", tags=["Category Management"])
     app.include_router(get_all_categories_router, prefix="/get-all-categories", tags=["Category Management"])
+    app.include_router(get_category_by_cid_router,prefix="/get-category-by-course-id",tags=["Category Management"])
     app.include_router(get_all_courses_router, prefix="/get-all-courses", tags=["Course Management"])
     app.include_router(create_course_router, prefix="/create-course", tags=["Course Management"])
+
+    # Chat
+    app.include_router(get_chat_history_router, prefix = "/chats")
+
+
+    #Profile
+    app.include_router(get_org_logo_router, prefix='/get-logo')
+
+    # Health Check
     app.include_router(health_router, prefix="/health", tags=["Health Check"])
 
     return app

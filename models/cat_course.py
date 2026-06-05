@@ -19,13 +19,13 @@ class CatCourse(Base):
 
     catid = Column(
         UUID(as_uuid=True),
-        ForeignKey("category.id", ondelete="CASCADE"),
+        ForeignKey("categories.id", ondelete="CASCADE"),
         primary_key=True,
     )
 
     cid = Column(
         UUID(as_uuid=True),
-        ForeignKey("course.id", ondelete="CASCADE"),
+        ForeignKey("courses.id", ondelete="CASCADE"),
         primary_key=True,
     )
 

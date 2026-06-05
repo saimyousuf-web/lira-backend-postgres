@@ -17,5 +17,7 @@ class Settings(BaseSettings):
     DISABLE_EMAILS: bool
     DYNAMODB_LIRA_ROLE_POLICIES_TABLE_NAME: str
     DYNAMODB_USERS_ACCESS_TABLE_NAME: str
+    # --- S3 ----
+    S3_BASE_FILE_URL: str | None = None
 
 settings = Settings()

@@ -12,7 +12,7 @@ from core.config import settings
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from core.db import get_db_session
-from auth.cognito import find_user
+# from auth.cognito import find_user
 from models.user import User
 
 router = APIRouter()
@@ -40,7 +40,8 @@ async def register_client_user(
     db: AsyncSession = Depends(get_db_session),
 ):
     try:
-        # 1) role for learner
+        # check if user exists in cognito else raise exception
+        
         role_result = await db.execute(
             select(Role).where(Role.name == "LEARNER")
         )

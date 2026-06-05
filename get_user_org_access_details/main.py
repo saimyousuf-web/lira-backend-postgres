@@ -1,6 +1,6 @@
 import uuid
 from xml.dom import Node
-from auth.main import get_current_user
+from dependencies.auth import get_current_user
 from models.lira_access import LiraAccess
 from models.nodes import Dept, Func, NodeType, Org
 from models.user import User
