@@ -3,7 +3,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 import uuid
-
 from dependencies.auth import require_permission
 from create_functions.schema import CreateFunctionsRequest, CreateFunctionsResponse
 from core.db import get_db_session
@@ -55,9 +54,9 @@ async def create_functions(
 
         parent_dept = await db.scalar(
             select(Dept).where(
-                Dept.node_id == parent_dept_id,
-                Dept.org_id == org_id,
-                Dept.is_active == True,
+                Dept.ndid == parent_dept_id,
+                Dept.orgid == org_id,
+                Dept.isact == True,
             )
         )
         if not parent_dept:
@@ -67,7 +66,7 @@ async def create_functions(
             )
 
         func_type = await db.scalar(
-            select(NodeType).where(NodeType.type == "FUNC")
+            select(NodeType).where(NodeType.ty == "FUNC")
         )
         if not func_type:
             raise HTTPException(
@@ -78,18 +77,18 @@ async def create_functions(
         new_funcs = []
 
         for name in normalized_names:
-            node = Node(node_type_id=func_type.id)
+            node = Node(ndtyid=func_type.id)
             db.add(node)
             await db.flush()
 
             func = Func(
-                node_id=node.id,
-                org_id=org_id,
-                parent_id=parent_dept_id,
-                name=name,
-                is_active=True,
-                created_by=user_id,
-                updated_by=user_id,
+                ndid=node.id,
+                orgid=org_id,
+                prtndid=parent_dept_id,
+                nm=name,
+                isact=True,
+                crtby=user_id,
+                updby=user_id,
             )
             db.add(func)
             new_funcs.append(func)
@@ -113,5 +112,5 @@ async def create_functions(
     return CreateFunctionsResponse(
         status="success",
         message="Functions created successfully",
-        data=[{"name": func.name, "success": True} for func in new_funcs],
+        data=[{"name": func.nm, "success": True} for func in new_funcs],
     )

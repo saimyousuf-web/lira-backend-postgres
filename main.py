@@ -18,6 +18,11 @@ from health import router as health_router
 from get_all_organization.main import router as get_all_organization_router
 from get_all_departments_by_org.main import router as get_all_departments_by_org_router
 from get_all_functions_by_dept.main import router as get_all_functions_by_dept_router
+from get_list_nodes.main import router as get_list_nodes_router
+from health import router as health_router
+from ingest.main import router as ingest_router
+
+
 async def init_db():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
@@ -40,6 +45,7 @@ def create_app() -> FastAPI:
     app.include_router(get_user_current_info_router, prefix="/get-user-current-info",tags=["Authentication APIs"])
 
 
+    app.include_router(ingest_router, prefix="/ingest", tags=["Ingestion"])
     app.include_router(create_departments_router, prefix="/create-departments", tags=["Department Management"])
     app.include_router(create_organization_router, prefix="/create-organizations", tags=["Organization Management"])
     app.include_router(create_functions_router, prefix="/create-functions", tags=["Function Management"])
@@ -60,7 +66,7 @@ def create_app() -> FastAPI:
 
     # Health Check
     app.include_router(health_router, prefix="/health", tags=["Health Check"])
-
+    app.include_router(get_list_nodes_router, prefix="/get-list-nodes", tags=["Node Management"])
     return app
 
 
