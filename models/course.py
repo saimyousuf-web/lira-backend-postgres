@@ -48,7 +48,7 @@ class Course(Base):
         server_default="DRAFT",
     )
 
-    no_of_modules = Column(
+    modnum = Column(
         Integer,
         nullable=False,
         server_default="0",
