@@ -13,6 +13,7 @@ from create_course.main import router as create_course_router
 from get_list_nodes.main import router as get_list_nodes_router
 from health import router as health_router
 from ingest.main import router as ingest_router
+from chat_stream.main import router as chat_stream_router
 
 async def init_db():
     async with engine.begin() as conn:
@@ -42,6 +43,7 @@ def create_app() -> FastAPI:
     app.include_router(create_course_router, prefix="/create-course", tags=["Course Management"])
     app.include_router(health_router, prefix="/health", tags=["Health Check"])
     app.include_router(get_list_nodes_router, prefix="/get-list-nodes", tags=["Node Management"])
+    app.include_router(chat_stream_router, prefix="/rag")
     return app
 
 

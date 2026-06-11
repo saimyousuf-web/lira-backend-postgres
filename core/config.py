@@ -21,5 +21,7 @@ class Settings(BaseSettings):
     QDRANT_URL: str
     QDRANT_API_KEY: str
     QDRANT_COLLECTION: str
+    S3_BASE_FILE_URL: str | None = None
+    PINECONE_API_KEY: str
 
 settings = Settings()
