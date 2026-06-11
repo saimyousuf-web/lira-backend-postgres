@@ -7,14 +7,14 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.db import get_db_session
-from dependencies.auth import get_current_user
+from auth.main import get_current_user
 from models.conversation import Conversation
 from models.course import Course
 
 router = APIRouter()
 
 @router.get("/{ctx_orgid}/{ctx_ndid}/{ctx_ndty}")
-async def get_conversations(
+async def list_user_chats(
     ctx_orgid: UUID = Path(..., description="Organization ID"),
     ctx_ndid: UUID = Path(..., description="Node ID"),
     ctx_ndty: str = Path(..., description="Node Type"),

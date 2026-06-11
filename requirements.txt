@@ -1,0 +1,17 @@
+fastapi
+uvicorn
+python-jose[cryptography]
+sqlalchemy
+pydantic-settings
+psycopg[binary]
+boto3
+requests
+pytesseract
+python-docx
+langchain-core
+langchain-text-splitters
+numpy
+pinecone
+qdrant-client
+pymupdf
+pydantic[email]

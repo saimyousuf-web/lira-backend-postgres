@@ -1,6 +1,6 @@
 import uuid
 from xml.dom import Node
-from dependencies.auth import get_current_user
+from auth.main import get_current_user
 from models.lira_access import LiraAccess
 from models.nodes import Dept, Func, NodeType, Org
 from models.user import User
@@ -20,7 +20,7 @@ async def get_user_details(
     db: AsyncSession = Depends(get_db_session)
 ):
     user_id = uuid.UUID(user.get("sub"))
-
+    print("hello")
     try:
         user_row = await db.scalar(
             select(User).where(User.id == user_id)

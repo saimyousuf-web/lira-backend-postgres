@@ -2,7 +2,7 @@ from typing import List
 from uuid import UUID
 from fastapi import APIRouter,Path,Depends,HTTPException
 from core.db import get_db_session
-from dependencies.auth import get_current_user
+from auth.main import get_current_user
 from get_category_by_cid.schema import CategoryResponse
 from models.cat_course import CatCourse
 from models.category import Category
