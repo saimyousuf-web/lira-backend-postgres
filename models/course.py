@@ -48,11 +48,11 @@ class Course(Base):
         server_default="DRAFT",
     )
 
-    # no_of_modules = Column(
-    #     Integer,
-    #     nullable=False,
-    #     server_default="0",
-    # )
+    modnum = Column(
+        Integer,
+        nullable=False,
+        server_default="0",
+    )
 
     crtat = Column(
         DateTime(timezone=True),

@@ -11,6 +11,11 @@ from get_all_categories.main import router as get_all_categories_router
 from get_all_courses.main import router as get_all_courses_router
 from create_course.main import router as create_course_router
 from get_list_nodes.main import router as get_list_nodes_router
+from get_course_by_catid.main import router as get_course_by_catid_router
+from get_module_by_cid.main import router as get_module_by_cid_router
+from approve_module.main import router as approve_module_router
+from get_course_by_catid.main import router as get_course_by_catid_router
+from create_catcourse.main import router as create_catcourse_router
 from health import router as health_router
 from ingest.main import router as ingest_router
 from chat_stream.main import router as chat_stream_router
@@ -47,6 +52,11 @@ def create_app() -> FastAPI:
     
     app.include_router(chat_stream_router, prefix="/rag")
     app.include_router(dashboard_chat_router, prefix="/dashboard-chat")
+    app.include_router(get_course_by_catid_router, prefix="/get-course-by-catid", tags=["Course Management"])
+    app.include_router(approve_module_router, prefix="/approve-module", tags=["Module Management"])
+    app.include_router(get_module_by_cid_router, prefix="/get-modules-by-course-id", tags=["Module Management"])
+    app.include_router(get_course_by_catid_router, prefix="/get-course-by-catid", tags=["Course Management"])
+    app.include_router(create_catcourse_router, prefix="/create-catcourse", tags=["Category Management"])
     return app
 
 
