@@ -1,0 +1,159 @@
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, update
+from uuid import UUID
+
+from models.conversation import Conversation
+from models.session import Session
+from chat_stream.repositories.Iconversation import ConversationRepository
+from collections import deque, defaultdict
+from asyncio import Lock
+import asyncio
+from datetime import datetime
+
+class PostgresConversationRepository(ConversationRepository):
+
+    def __init__(self, db: AsyncSession):
+        self.db = db
+
+
+    async def get_conversation(self, conversation_id: UUID,):
+        stmt = (
+            select(Conversation)
+            .where(Conversation.id == conversation_id)
+        )
+
+        result = await self.db.execute(stmt)
+
+        return result.scalar_one_or_none()
+    
+    async def create_conversation(
+        self,
+        conversation_id: UUID,
+        uid: UUID,
+        ndid: UUID,
+        course_id: UUID,
+        title: str,
+        created_by: UUID,
+        sts: str,
+        step: str
+    ):
+        conversation = Conversation(
+            id=conversation_id,
+            uid=uid,
+            ndid=ndid,
+            cid=course_id,
+            title=title,
+            crtby=created_by,
+            updby=created_by,
+            sts = sts,
+            step= step
+        )
+
+        self.db.add(conversation)
+
+        await self.db.flush()
+        await self.db.refresh(conversation)
+        
+        return conversation
+
+    
+    async def update_conversation(
+        self,
+        conversation_id: UUID,
+        last_message: str,
+        step: str
+    ):
+        stmt = (
+            update(Session)
+            .where(Session.convid == conversation_id)
+            .values(
+                msgtxt=last_message[:100],
+                updat=datetime.utcnow(),
+                # msgnum=Conversation.msgnum + 1,
+                # step=step,
+            )
+            .returning(Session)
+        )
+
+        result = await self.db.execute(stmt)
+        updated = result.scalar_one_or_none()
+
+        if updated:
+            await asyncio.gather(
+                self.update_step(conversation_id, step),
+                self.increment_message_count(conversation_id)
+            )
+            
+            return updated
+        
+        return None
+
+
+    async def create_message( # message stored at session table
+        self,
+        conversation_id: UUID,
+        sender: UUID,
+        message: str,
+        created_by: UUID,
+        updated_by: UUID
+    ):
+        db_message = Session(
+            convid=conversation_id,
+            msgtxt=message,
+            sender=sender,
+            crtby=created_by,
+            updby=updated_by,
+        )
+
+        self.db.add(db_message)
+
+        await self.db.flush()
+        await self.db.refresh(db_message)
+
+        await self.increment_message_count(conversation_id)
+
+        return db_message
+
+
+    async def get_recent_messages(
+        self,
+        conversation_id: UUID,
+        limit: int = 20,
+    ):
+        stmt = (
+            select(Session)
+            .where(
+                Session.convid
+                == conversation_id
+            )
+            .order_by(
+                Session.crtat.desc()
+            )
+            .limit(limit)
+        )
+
+        result = await self.db.execute(stmt)
+
+        messages = result.scalars().all()
+
+        return list(reversed(messages))
+
+    
+    async def increment_message_count(self, conversation_id: UUID):
+        await self.db.execute(
+            update(Conversation)
+            .where(Conversation.id == conversation_id)
+            .values(msgnum=Conversation.msgnum + 1)
+        )
+
+    async def update_step(self, conversation_id: UUID, step: str):
+        await self.db.execute(
+            update(Conversation)
+            .where(Conversation.id == conversation_id)
+            .values(step=step)
+        )
+
+    
+
+
+

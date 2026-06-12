@@ -111,32 +111,32 @@ def validate_org_membership(
     if node_type == "ORG":
         org = (
             db.query(Org)
-            .filter(Org.node_id == node_id)
+            .filter(Org.ndid == node_id)
             .first()
         )
 
         if not org:
             return False
 
-        return str(org.node_id) == str(org_id)
+        return str(org.ndid) == str(org_id)
 
 
     if node_type == "DEPT":
         dept = (
             db.query(Dept)
-            .filter(Dept.node_id == node_id)
+            .filter(Dept.ndid == node_id)
             .first()
         )
 
         if not dept:
             return False
 
-        return str(dept.parent_id) == str(org_id)
+        return str(dept.prtndid) == str(org_id)
 
     if node_type == "FUNC":
         func = (
             db.query(Func)
-            .filter(Func.node_id == node_id)
+            .filter(Func.ndid == node_id)
             .first()
         )
 
@@ -145,14 +145,14 @@ def validate_org_membership(
 
         dept = (
             db.query(Dept)
-            .filter(Dept.node_id == func.parent_id)
+            .filter(Dept.ndid == func.prtndid)
             .first()
         )
 
         if not dept:
             return False
 
-        return str(dept.parent_id) == str(org_id)
+        return str(dept.prtndid) == str(org_id)
 
     return False
 
@@ -182,11 +182,11 @@ def authorize_user(
         access = (
             db.query(LiraAccess)
             .join(Node, Node.id == LiraAccess.ndid)
-            .join(NodeType, NodeType.id == Node.node_type_id)
+            .join(NodeType, NodeType.id == Node.ndtyid)
             .filter(
                 LiraAccess.uid == user_id,
                 LiraAccess.ndid == node_id,
-                NodeType.type == node_type,
+                NodeType.ty == node_type,
             )
             .first()
         )
@@ -196,12 +196,12 @@ def authorize_user(
                 "User not member of this node"
             )
 
-        if not access.is_active:
+        if not access.isact:
             raise AuthorizationError(
                 "User access is inactive"
             )
 
-        if not access.is_approved:
+        if not access.isapr:
             raise AuthorizationError(
                 "User not approved"
             )

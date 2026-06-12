@@ -1,8 +1,16 @@
-from sqlalchemy import Column, String, Integer, DateTime, ForeignKey
+from sqlalchemy import (
+    Column,
+    String,
+    Integer,
+    DateTime,
+    ForeignKey,
+    CheckConstraint,
+    Index,
+    text,
+)
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
-import uuid
-
+from sqlalchemy.orm import relationship
 from core.db import Base
 
 
@@ -12,42 +20,40 @@ class Conversation(Base):
     id = Column(
         UUID(as_uuid=True),
         primary_key=True,
-        default=uuid.uuid4,
+        server_default=text("gen_random_uuid()")
     )
 
     uid = Column(
         UUID(as_uuid=True),
-        ForeignKey("users.id"),
+        ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
     )
 
     ndid = Column(
         UUID(as_uuid=True),
-        ForeignKey("nodes.id"),
+        ForeignKey("nodes.id", ondelete="CASCADE"),
         nullable=False,
     )
 
     cid = Column(
         UUID(as_uuid=True),
-        ForeignKey("courses.id"),
+        ForeignKey("courses.id", ondelete="CASCADE"),
         nullable=False,
     )
 
-    title = Column(
-        String,
-        nullable=True,
-    )
+    title = Column(String(255), nullable=True)
+    step = Column(String(255), nullable=True)
 
     sts = Column(
-        String,
+        String(20),
         nullable=False,
-        default="ACTIVE",
+        server_default="ACTIVE",
     )
 
     msgnum = Column(
         Integer,
         nullable=False,
-        default=0,
+        server_default="0",
     )
 
     crtat = Column(
@@ -63,12 +69,22 @@ class Conversation(Base):
         onupdate=func.now(),
     )
 
-    crtby = Column(
-        UUID(as_uuid=True),
-        nullable=True,
+    crtby = Column(UUID(as_uuid=True), nullable=True)
+    updby = Column(UUID(as_uuid=True), nullable=True)
+
+    
+    sessions = relationship(
+        "Session",
+        back_populates="conversation",
     )
 
-    updby = Column(
-        UUID(as_uuid=True),
-        nullable=True,
+
+    __table_args__ = (
+        CheckConstraint(
+            "sts IN ('ACTIVE', 'CLOSED')",
+            name="conversation_sts_check",
+        ),
+        Index("idx_sessions_user", "uid"),
+        Index("idx_sessions_node", "ndid"),
+        Index("idx_sessions_course", "cid"),
     )

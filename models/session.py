@@ -1,7 +1,15 @@
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import (
+    Column,
+    String,
+    Text,
+    DateTime,
+    ForeignKey,
+    CheckConstraint,
+    Index,
+    func,
+)
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy import Text, String, DateTime
-from sqlalchemy.sql import func
+from sqlalchemy.orm import relationship
 import uuid
 
 from core.db import Base
@@ -10,46 +18,63 @@ from core.db import Base
 class Session(Base):
     __tablename__ = "session"
 
-    id: Mapped[uuid.UUID] = mapped_column(
+    id = Column(
         UUID(as_uuid=True),
         primary_key=True,
         default=uuid.uuid4,
     )
 
-    convid: Mapped[uuid.UUID] = mapped_column(
+    convid = Column(
         UUID(as_uuid=True),
+        ForeignKey("conversation.id", ondelete="CASCADE"),
         nullable=False,
     )
 
-    msgtxt: Mapped[str] = mapped_column(
+    msgtxt = Column(
         Text,
         nullable=False,
     )
 
-    sender: Mapped[str] = mapped_column(
-        String,
+    sender = Column(
+        String(10),
         nullable=False,
     )
 
-    crtby: Mapped[uuid.UUID | None] = mapped_column(
+    crtby = Column(
         UUID(as_uuid=True),
         nullable=True,
     )
 
-    updby: Mapped[uuid.UUID | None] = mapped_column(
+    updby = Column(
         UUID(as_uuid=True),
         nullable=True,
     )
 
-    crtat: Mapped[DateTime] = mapped_column(
+    crtat = Column(
         DateTime(timezone=True),
         nullable=False,
         server_default=func.now(),
     )
 
-    updat: Mapped[DateTime] = mapped_column(
+    updat = Column(
         DateTime(timezone=True),
         nullable=False,
         server_default=func.now(),
         onupdate=func.now(),
+    )
+
+    conversation = relationship(
+        "Conversation",
+        back_populates="sessions",
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "sender IN ('USER', 'BOT')",
+            name="session_sender_check",
+        ),
+        Index(
+            "idx_chats_session",
+            "convid",
+        ),
     )
