@@ -1,5 +1,6 @@
 from workers.extractors.docx import chunk_and_embed_docx
 from workers.extractors.pdf import  chunk_and_embed_pdf
+from workers.extractors.storyline import handle_zip_file
 import os
 import boto3
 from core.config import settings
@@ -21,8 +22,8 @@ async def process_document_internal(payload: dict):
 
     print(f"Processing file from S3: {s3_key}")
 
-    # if s3_key.endswith(".zip"):
-    #     return handle_zip_file(org_id, course_id, course_name, document_id, file_bytes,S3_BUCKET)
+    if s3_key.endswith(".zip"):
+        return handle_zip_file(org_id, course_id, course_name, document_id, file_bytes,S3_BUCKET)
 
     if s3_key.endswith(".pdf"):
        content_objects_json = await chunk_and_embed_pdf(file_bytes, document_id, course_id,org_id,course_name, db)

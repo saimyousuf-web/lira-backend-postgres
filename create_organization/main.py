@@ -24,25 +24,25 @@ async def create_organization(
     
 
     node_type = await db.scalar(
-        select(NodeType).where(NodeType.type == "ORG")
+        select(NodeType).where(NodeType.ty == "ORG")
     )
     if not node_type:
         raise HTTPException(status_code=500, detail="ORG node type not configured")
 
     # ── 6. Create nodes + orgs atomically ────────────────────────────
     try:
-        node = Node(node_type_id=node_type.id)
+        node = Node(nodtyid=node_type.id)
         db.add(node)
         await db.flush()                  # resolves node.id before org insert
 
         org = Org(
-            node_id=node.id,
-            parent_id=None,               # ORG is always root
-            org_id=node.id,               # self-ref since ORG is root
-            name=payload.name.strip(),
-            is_active=True,
-            created_by=user_id,
-            updated_by=user_id,
+            ndid=node.id,
+            prtndid=None,               # ORG is always root
+            orgid=node.id,               # self-ref since ORG is root
+            nm=payload.name.strip(),
+            isact=True,
+            crtby=user_id,
+            updby=user_id,
         )
         db.add(org)
         await db.flush()
@@ -59,6 +59,6 @@ async def create_organization(
         "message": "Organization created successfully",
         "data": {
             "org_id": str(node.id),
-            "name": org.name,
+            "name": org.nm,
         }
     }
