@@ -18,6 +18,8 @@ from get_course_by_catid.main import router as get_course_by_catid_router
 from create_catcourse.main import router as create_catcourse_router
 from health import router as health_router
 from ingest.main import router as ingest_router
+from chat_stream.main import router as chat_stream_router
+from dashboard_chat.main import router as dashboard_chat_router
 
 async def init_db():
     async with engine.begin() as conn:
@@ -47,6 +49,9 @@ def create_app() -> FastAPI:
     app.include_router(create_course_router, prefix="/create-course", tags=["Course Management"])
     app.include_router(health_router, prefix="/health", tags=["Health Check"])
     app.include_router(get_list_nodes_router, prefix="/get-list-nodes", tags=["Node Management"])
+    
+    app.include_router(chat_stream_router, prefix="/rag")
+    app.include_router(dashboard_chat_router, prefix="/dashboard-chat")
     app.include_router(get_course_by_catid_router, prefix="/get-course-by-catid", tags=["Course Management"])
     app.include_router(approve_module_router, prefix="/approve-module", tags=["Module Management"])
     app.include_router(get_module_by_cid_router, prefix="/get-modules-by-course-id", tags=["Module Management"])
