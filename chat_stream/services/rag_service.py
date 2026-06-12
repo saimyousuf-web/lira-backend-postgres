@@ -48,7 +48,7 @@ class RagService:
         user_id = user['sub']
         user_name= user['username']
         conversation_id = data["chat_id"]
-        step = 'done'
+        step = None
         step_description=None
         next_step=None
         if not conversation_id:
@@ -57,7 +57,7 @@ class RagService:
 
             chat_title = await generate_chat_title(user_message, initial_message)
 
-            await self.conversation_service.get_or_create_conversation(conversation_id, 'e498f428-c0e1-703a-fd99-b150aa902a3a', node_id, course_id, chat_title["chat_title"], user_id, "ACTIVE", step)
+            await self.conversation_service.get_or_create_conversation(conversation_id, user_id, node_id, course_id, chat_title["chat_title"], user_id, "ACTIVE", step)
 
             message = await self.conversation_service.add_message(
                 conversation_id,
@@ -65,6 +65,9 @@ class RagService:
                 'BOT',
                 initial_message,
             )
+        if step not in ['done']:
+            conversation = await self.conversation_service.get_conversation(conversation_id)
+            step = conversation.step
 
         chat_history = await self.get_context_history(conversation_id, user_id)
         
@@ -78,7 +81,7 @@ class RagService:
         
         query = analysis.get("search_query", user_message)
 
-        if user_message in ["Guided Journey"]:
+        if coach_mode and step not in ['done']:
             step_description, next_step = self._get_step_context(step, coach_mode, voice_mode)
 
         top_k = self._get_top_k(intent, coach_mode, voice_mode, step)
@@ -103,7 +106,7 @@ class RagService:
         
         course = await self.course_repository.get_course(course_id)
 
-        await self.conversation_service.get_or_create_conversation(conversation_id, 'e498f428-c0e1-703a-fd99-b150aa902a3a', node_id, course_id, None, user_id, "ACTIVE", step)
+        await self.conversation_service.get_or_create_conversation(conversation_id, user_id, node_id, course_id, None, user_id, "ACTIVE", step)
 
         message = await self.conversation_service.add_message(
             conversation_id,
@@ -157,7 +160,7 @@ class RagService:
         full_response = data.get("full_response")
         conversation_id = data.get("chat_id")
         user_id = user['sub']
-
+        step = data.get("next_step") or "done"
         if not full_response:
             raise HTTPException(status_code=400, detail="Missing full_response")
 
@@ -168,8 +171,11 @@ class RagService:
             full_response,
         )
 
-        
-        await self.conversation_service.save_message_cache(conversation_id, user_id, 'BOT', full_response,)
+        await asyncio.gather(
+            self.conversation_service.update_step(conversation_id, step),
+            self.conversation_service.save_message_cache(conversation_id, user_id, 'BOT', full_response,)
+        )
+
 
         return {"message": "saved success"}
     

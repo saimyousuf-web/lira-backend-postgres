@@ -201,3 +201,7 @@ class ConversationService:
         except:
             await self.db.rollback()
             raise
+
+    async def update_step(self, conversation_id: UUID, step: str):
+        await self.conversation_repository.update_step(conversation_id, step)
+        await self.db.commit()
