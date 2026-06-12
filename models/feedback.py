@@ -1,3 +1,12 @@
+from sqlalchemy.orm import Mapped, mapped_column
+
+from core.db import Base
+from sqlalchemy import Column, String, Text, DateTime, Boolean, Enum
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.sql import func
+import uuid
+
+from models.enums.feedback_status import FeedbackStatus
 from sqlalchemy import (
     Column,
     String,

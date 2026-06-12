@@ -21,6 +21,7 @@ class Node(Base):
     ndty = relationship("NodeType")
 
 
+
 class Org(Base):
     __tablename__ = "orgs"
     __table_args__ = (
@@ -28,7 +29,7 @@ class Org(Base):
     )
 
     ndid      = Column(UUID(as_uuid=True), ForeignKey("nodes.id", ondelete="CASCADE"), primary_key=True)
-    orgid       = Column(UUID(as_uuid=True), ForeignKey("orgs.node_id"), nullable=False)  # self-ref
+    orgid       = Column(UUID(as_uuid=True), ForeignKey("orgs.ndid"), nullable=False)  # self-ref
     prtndid    = Column(UUID(as_uuid=True), nullable=True, default=None)
     nm         = Column(String(255), nullable=False)
     title        = Column(String(255))
