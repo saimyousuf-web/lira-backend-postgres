@@ -153,7 +153,22 @@ class PostgresConversationRepository(ConversationRepository):
             .values(step=step)
         )
 
-    
+    async def update_message(self, user_message_checked: str, message_id: str, user_id: UUID):
+        stmt = (
+            update(Session)
+            .where(Session.id == message_id)
+            .values(
+                msgtxt=user_message_checked,
+                updat=datetime.utcnow(),
+                # msgnum=Conversation.msgnum + 1,
+                # step=step,
+            )
+            .returning(Session)
+        )
+
+        result = await self.db.execute(stmt)
+        updated = result.scalar_one_or_none()
+        return updated
 
 
 
