@@ -22,7 +22,7 @@ from get_all_functions_by_dept.main import router as get_all_functions_by_dept_r
 from get_list_nodes.main import router as get_list_nodes_router
 from get_all_feedback.main import router as get_all_feedback_router
 from health import router as health_router
-from ingest.main import router as ingest_router
+# from ingest.main import router as ingest_router
 from update_feedback_status.main import router as update_feedback_status_router 
 from delete_feedback.main import router as delete_feedback_router
 from get_all_users.main import router as get_all_users_router 
@@ -62,7 +62,7 @@ def create_app() -> FastAPI:
     app.include_router(create_new_user_router,prefix="/create-user",tags=["User Management"])
 
 
-    app.include_router(ingest_router, prefix="/ingest", tags=["Ingestion"])
+    # app.include_router(ingest_router, prefix="/ingest", tags=["Ingestion"])
     app.include_router(create_departments_router, prefix="/create-departments", tags=["Department Management"])
     app.include_router(create_organization_router, prefix="/create-organizations", tags=["Organization Management"])
     app.include_router(create_functions_router, prefix="/create-functions", tags=["Function Management"])
