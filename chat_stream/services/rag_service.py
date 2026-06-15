@@ -9,11 +9,11 @@ import numpy as np
 from core.config import settings
 
 
-from chat_stream.user_message_analyzer import analyze_user_message
-from chat_stream.prompt_template import getPromptTemplate
-from chat_stream.modes import get_interation_mode, get_policy_by_decision_mode
-from chat_stream.generate_title import generate_chat_title
-from chat_stream.steps_snippet import get_step_details
+from chat_stream.utils.user_message_analyzer import analyze_user_message
+from chat_stream.utils.prompt_template import getPromptTemplate
+from chat_stream.utils.modes import get_interation_mode, get_policy_by_decision_mode
+from chat_stream.utils.generate_title import generate_chat_title
+from chat_stream.utils.steps_snippet import get_step_details
 from datetime import datetime
 from core.config import Settings
 class RagService:
@@ -48,6 +48,7 @@ class RagService:
         user_id = user['sub']
         user_name= user['username']
         conversation_id = data["chat_id"]
+        checkboxed_message = data["active_message_checkbox"]
         step = None
         step_description=None
         next_step=None
@@ -68,6 +69,8 @@ class RagService:
         if step not in ['done']:
             conversation = await self.conversation_service.get_conversation(conversation_id)
             step = conversation.step
+        if checkboxed_message:
+            await self.conversation_service.update_message(checkboxed_message.get("html"), checkboxed_message.get("key"), user_id)
 
         chat_history = await self.get_context_history(conversation_id, user_id)
         
@@ -106,18 +109,12 @@ class RagService:
         
         course = await self.course_repository.get_course(course_id)
 
-        await self.conversation_service.get_or_create_conversation(conversation_id, user_id, node_id, course_id, None, user_id, "ACTIVE", step)
-
-        message = await self.conversation_service.add_message(
-            conversation_id,
-            user_id,
-            'USER',
-            user_message,
-        )
-
-
-        await self.conversation_service.save_message_cache(conversation_id, user_id, 'USER', user_message,)
         
+        message, _, _ = await asyncio.gather(
+            self.conversation_service.add_message(conversation_id,user_id,'USER',user_message,),
+            self.conversation_service.get_or_create_conversation(conversation_id, user_id, node_id, course_id, None, user_id, "ACTIVE", step),
+            self.conversation_service.save_message_cache(conversation_id, user_id, 'USER', user_message,),
+        )
 
         prompt = getPromptTemplate(
             coach_mode=coach_mode,
@@ -134,7 +131,7 @@ class RagService:
             step = step_override
         )
 
-        obj = {
+        return {
             "streaming_metadata": {
                 "prompt": prompt,
                 "voice_mode": voice_mode
@@ -151,9 +148,6 @@ class RagService:
                 "message_id": message.id
             }
         }
-
-
-        return obj
 
     # save
     async def save(self, user: str, data: dict) -> Dict:

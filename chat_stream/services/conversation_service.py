@@ -205,3 +205,7 @@ class ConversationService:
     async def update_step(self, conversation_id: UUID, step: str):
         await self.conversation_repository.update_step(conversation_id, step)
         await self.db.commit()
+    
+    async def update_message(self, user_message_checked, message_id, user_id: UUID):
+        await self.conversation_repository.update_message(user_message_checked, message_id, user_id)
+        await self.db.commit()
