@@ -53,14 +53,13 @@ class Feedback(Base):
 )
     updby = Column(UUID(as_uuid=True), nullable=True)
     ndid = Column(UUID(as_uuid=True), nullable=False)
-    sts: Mapped[FeedbackStatus] = mapped_column(
-        Enum(
-            FeedbackStatus,
-            values_callable=lambda enum_cls: [e.value for e in enum_cls],
-            name="feedback_sts",
-            create_type=False,
-        ),
-        default=FeedbackStatus.PENDING,
-    )
+    sts = Column(
+    Enum(
+        FeedbackStatus,
+        values_callable=lambda x: [e.value for e in x]
+    ),
+    nullable=False,
+    server_default=FeedbackStatus.PENDING.value,
+)
 
-    
+        
