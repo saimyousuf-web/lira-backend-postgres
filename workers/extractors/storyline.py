@@ -32,7 +32,7 @@ from workers.extractors.pdf import _split_text_with_images
 from models.chunks import Chunk
 from models.course_module import CourseModule
 from models.module import Module
-from workers.vector import bedrock_client, normalize_vector
+from workers.vector import generate_embedding, normalize_vector
 from workers.qdrnt_vector import get_qdrant_client, QDRANT_COLLECTION
 
 logger = logging.getLogger(__name__)
@@ -334,13 +334,7 @@ def _embed_and_upsert_qdrant(
     slide_title: str = "",
 ) -> tuple[str, int]:
     try:
-        response = bedrock_client.invoke_model(
-            modelId="amazon.titan-embed-text-v2:0",
-            contentType="application/json",
-            body=json.dumps({"inputText": text}),
-        )
-        body      = json.loads(response["body"].read())
-        embedding = body.get("embedding")
+        embedding = generate_embedding(text)
 
         if not (isinstance(embedding, list) and len(embedding) == 1024):
             return "failed", 0

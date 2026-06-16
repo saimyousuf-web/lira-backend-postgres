@@ -25,6 +25,10 @@ class Settings(BaseSettings):
     QDRANT_COLLECTION : str
     QDRANT_COLLECTION: str
     S3_BASE_FILE_URL: str | None = None
-    PINECONE_API_KEY: str
+    # --- Ollama (local LLM) ---
+    OLLAMA_BASE_URL: str = "http://localhost:11434"
+    OLLAMA_MODEL: str = "llama3.2:3b"
+    # --- Local embeddings ---
+    EMBEDDING_MODEL: str = "BAAI/bge-large-en-v1.5"
 
 settings = Settings()

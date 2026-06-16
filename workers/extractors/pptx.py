@@ -27,7 +27,7 @@ from models.chunks import Chunk
 from models.course_module import CourseModule
 from models.module import Module
 from utils.text_chunking import chunk_text_with_images, group_images_with_previous_text
-from workers.vector import bedrock_client, normalize_vector
+from workers.vector import generate_embedding, normalize_vector
 from workers.qdrnt_vector import get_qdrant_client, QDRANT_COLLECTION
 
 # ---------------------------------------------------------------------------
@@ -216,13 +216,7 @@ def _embed_and_upsert_qdrant(
     page_num:    int,
 ) -> tuple[str, int]:
     try:
-        response = bedrock_client.invoke_model(
-            modelId="amazon.titan-embed-text-v2:0",
-            contentType="application/json",
-            body=json.dumps({"inputText": text}),
-        )
-        body      = json.loads(response["body"].read())
-        embedding = body.get("embedding")
+        embedding = generate_embedding(text)
 
         if not (isinstance(embedding, list) and len(embedding) == 1024):
             return "failed", 0
@@ -274,7 +268,7 @@ async def chunk_and_embed_pptx(
     1. Validate Module + CourseModule exist in Postgres.
     2. Upload qualifying images → S3, run Textract OCR.
     3. Build overlapping text + image chunks per slide.
-    4. Embed each chunk (Amazon Titan) → upsert Qdrant.
+    4. Embed each chunk (gte-large-en-v1.5) → upsert Qdrant.
     5. Persist Chunk rows + update Module / CourseModule — one transaction.
     """
     user_id = uuid.UUID("6418e458-50a1-70fe-9d3e-b52f5d2df57c")

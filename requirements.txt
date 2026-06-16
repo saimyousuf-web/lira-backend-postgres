@@ -11,7 +11,10 @@ python-docx
 langchain-core
 langchain-text-splitters
 numpy
-pinecone
 qdrant-client
 pymupdf
 pydantic[email]
+httpx
+sentence-transformers
+einops
+torch

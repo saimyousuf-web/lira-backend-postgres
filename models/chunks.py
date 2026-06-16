@@ -7,7 +7,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
 )
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID, ARRAY
 from sqlalchemy.sql import func
 
 from core.db import Base
@@ -43,6 +43,11 @@ class Chunk(Base):
     txt = Column(
         Text,
         nullable=False,
+    )
+
+    imgkeys = Column(
+        ARRAY(Text),
+        nullable=True,
     )
 
     crtat = Column(

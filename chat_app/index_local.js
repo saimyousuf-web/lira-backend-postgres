@@ -1,7 +1,3 @@
-import {
-  BedrockRuntimeClient,
-  InvokeModelWithResponseStreamCommand,
-} from "@aws-sdk/client-bedrock-runtime";
 import { PollyClient, SynthesizeSpeechCommand } from "@aws-sdk/client-polly";
 import express from "express";
 
@@ -9,10 +5,44 @@ const PYTHON_RAG_URL = process.env.PYTHON_RAG_URL || 'http://127.0.0.1:8000/rag'
 const PYTHON_SAVE_URL = process.env.PYTHON_SAVE_URL || 'http://127.0.0.1:8000/rag/save' || "http://localhost:8000/rag/save";
 const POLLY_VOICE = process.env.POLLY_VOICE || "Stephen";
 const AWS_REGION = process.env.AWS_REGION || "us-east-1";
+const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL || "http://localhost:11434";
+const OLLAMA_MODEL = process.env.OLLAMA_MODEL || "llama3.2:3b";
 
 /* ---------------- AWS CLIENTS ---------------- */
-const bedrock = new BedrockRuntimeClient({ region: AWS_REGION });
 const polly = new PollyClient({ region: AWS_REGION });
+
+/* ---------------- OLLAMA STREAM HELPER ---------------- */
+async function* streamOllamaTokens(prompt) {
+  const res = await fetch(`${OLLAMA_BASE_URL}/api/chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: OLLAMA_MODEL,
+      stream: true,
+      options: { temperature: 0.4, num_predict: 4096 },
+      messages: [{ role: "user", content: prompt }],
+    }),
+  });
+
+  if (!res.ok || !res.body) throw new Error("Ollama request failed");
+
+  const decoder = new TextDecoder();
+  let lineBuffer = "";
+
+  for await (const chunk of res.body) {
+    lineBuffer += decoder.decode(chunk, { stream: true });
+    const lines = lineBuffer.split("\n");
+    lineBuffer = lines.pop() ?? "";
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      const parsed = JSON.parse(trimmed);
+      const token = parsed.message?.content || "";
+      if (token) yield token;
+    }
+  }
+}
 
 /* ---------------- EXPRESS ---------------- */
 const app = express();
@@ -120,21 +150,7 @@ app.post("/stream", async (req, res) => {
       "X-Chat-Id": storage_metadata?.chat_id || "",
     });
 
-    /* ---------- 3. Bedrock request (same for both modes) ---------- */
-    const command = new InvokeModelWithResponseStreamCommand({
-      modelId: "us.anthropic.claude-haiku-4-5-20251001-v1:0",
-      contentType: "application/json",
-      accept: "application/json",
-      body: JSON.stringify({
-        anthropic_version: "bedrock-2023-05-31",
-        max_tokens: 4096,
-        temperature: 0.4,
-        messages: [{ role: "user", content: [{ type: "text", text: prompt }] }],
-      }),
-    });
-
-    const response = await bedrock.send(command);
-    const decoder = new TextDecoder();
+    /* ---------- 3. Ollama request (same for both modes) ---------- */
     let fullResponse = "";
 
     if (voice_mode) {
@@ -148,34 +164,23 @@ app.post("/stream", async (req, res) => {
 
       let textBuffer = "";
 
-      for await (const streamEvent of response.body) {
-        const chunk = streamEvent.chunk;
-        if (!chunk) continue;
+      for await (const token of streamOllamaTokens(prompt)) {
+        textBuffer += token;
+        fullResponse += token;
 
-        const parsed = JSON.parse(decoder.decode(chunk.bytes, { stream: true }));
+        // Send token immediately for UI text display
+        writeLine(res, { type: "text", text: token });
 
-        if (
-          parsed.type === "content_block_delta" &&
-          parsed.delta?.type === "text_delta"
-        ) {
-          const token = parsed.delta.text;
-          textBuffer += token;
-          fullResponse += token;
-
-          // Send token immediately for UI text display
-          writeLine(res, { type: "text", text: token });
-
-          // Sentence boundary → synthesize → send audio chunk
-          if (shouldSpeak(textBuffer)) {
-            try {
-              const audioB64 = await synthesize(textBuffer);
-              writeLine(res, { type: "audio", audio: audioB64, text: textBuffer });
-            } catch (pollyErr) {
-              console.error("[polly] chunk error:", pollyErr);
-              writeLine(res, { type: "audio_error", text: textBuffer });
-            }
-            textBuffer = "";
+        // Sentence boundary → synthesize → send audio chunk
+        if (shouldSpeak(textBuffer)) {
+          try {
+            const audioB64 = await synthesize(textBuffer);
+            writeLine(res, { type: "audio", audio: audioB64, text: textBuffer });
+          } catch (pollyErr) {
+            console.error("[polly] chunk error:", pollyErr);
+            writeLine(res, { type: "audio_error", text: textBuffer });
           }
+          textBuffer = "";
         }
       }
 
@@ -204,24 +209,13 @@ app.post("/stream", async (req, res) => {
 
       let buffer = "";
 
-      for await (const streamEvent of response.body) {
-        const chunk = streamEvent.chunk;
-        if (!chunk) continue;
+      for await (const token of streamOllamaTokens(prompt)) {
+        buffer += token;
+        fullResponse += token;
 
-        const parsed = JSON.parse(decoder.decode(chunk.bytes, { stream: true }));
-
-        if (
-          parsed.type === "content_block_delta" &&
-          parsed.delta?.type === "text_delta"
-        ) {
-          const text = parsed.delta?.text;
-          buffer += text;
-          fullResponse += text;
-
-          if (buffer.length > 10 || /[\s.,!?]$/.test(buffer)) {
-            res.write(buffer);
-            buffer = "";
-          }
+        if (buffer.length > 10 || /[\s.,!?]$/.test(buffer)) {
+          res.write(buffer);
+          buffer = "";
         }
       }
 

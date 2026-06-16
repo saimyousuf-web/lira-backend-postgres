@@ -30,7 +30,7 @@ from core.db import get_db_session
 from models.chunks import Chunk
 from models.course_module import CourseModule
 from models.module import Module
-from workers.vector import bedrock_client,  normalize_vector
+from workers.vector import generate_embedding, normalize_vector
 from qdrant_client.models import PointStruct
 import os
 from workers.qdrnt_vector import QDRANT_COLLECTION, QDRANT_COLLECTION, get_qdrant_client
@@ -299,19 +299,13 @@ def _embed_and_upsert(
     module_id: uuid.UUID,
     page_num: int,
 ) -> tuple[str, int]:
-    """Embed one chunk and upsert into Pinecone. Returns (status, dim)."""
+    """Embed one chunk and upsert into Qdrant. Returns (status, dim)."""
     try:
-        response = bedrock_client.invoke_model(
-            modelId="amazon.titan-embed-text-v2:0",
-            contentType="application/json",
-            body=json.dumps({"inputText": text}),
-        )
-        body = json.loads(response["body"].read())
-        embedding = body.get("embedding")
+        embedding = generate_embedding(text)
 
         if not (isinstance(embedding, list) and len(embedding) == 1024):
             return "failed", 0
-        
+
         normalized = normalize_vector(embedding)
         
         get_qdrant_client().upsert(
@@ -417,7 +411,7 @@ async def chunk_and_embed_pdf(
         raise HTTPException(status_code=422, detail="No content could be extracted from PDF")
 
     # ------------------------------------------------------------------
-    # 5 + 6. Embed → Pinecone, persist Chunk rows
+    # 5 + 6. Embed → Qdrant, persist Chunk rows
     # ------------------------------------------------------------------
     course_name = module.nm   # use real Course.nm if you join on it
 

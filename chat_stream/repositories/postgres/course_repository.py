@@ -61,6 +61,7 @@ class PostgresCourseRepository(CourseRepository):
                 Module.id.label("module_id"),
                 Module.nm.label("module_name"),
                 Module.ty.label("module_type"),
+                Module.loc.label("module_loc"),
 
                 Course.id.label("course_id"),
                 Course.nm.label("course_name"),

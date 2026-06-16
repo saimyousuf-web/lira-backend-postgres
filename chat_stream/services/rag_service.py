@@ -1,12 +1,11 @@
 from uuid import UUID, uuid4
 from fastapi import HTTPException
-import boto3
-from pinecone import Pinecone
-import json
 from typing import List, Dict, Any
 import asyncio
-import numpy as np
+from qdrant_client.models import Filter, FieldCondition, MatchValue
 from core.config import settings
+from core.embeddings import embed_text
+from workers.qdrnt_vector import get_qdrant_client, QDRANT_COLLECTION, normalize_vector
 
 
 from chat_stream.user_message_analyzer import analyze_user_message
@@ -29,10 +28,6 @@ class RagService:
         self.conversation_service = conversation_service
         self.feedback_repo = feedback_repo
         self.s3_base_url = settings.S3_BUCKET_NAME
-        self.bedrock = boto3.client("bedrock-runtime",region_name=settings.REGION)
-        self.pinecone = Pinecone(api_key=settings.PINECONE_API_KEY)
-
-        self.index = self.pinecone.Index('lira-vector-index')
 
     # ENTRY POINT
     async def execute(self, user: str,data: dict) -> Dict:
@@ -67,7 +62,11 @@ class RagService:
             )
         if step not in ['done']:
             conversation = await self.conversation_service.get_conversation(conversation_id)
-            step = conversation.step
+            # Guard against an unknown/stale chat_id: if the conversation doesn't
+            # exist, fall back to deriving the step instead of crashing on None.
+            step = conversation.step if conversation else self._get_step_mode(
+                coach_mode, voice_mode, user_message
+            )
 
         chat_history = await self.get_context_history(conversation_id, user_id)
         
@@ -196,33 +195,7 @@ class RagService:
 
 
     async def _generate_embedding(self,text: str,) -> list[float]:
-        response = self.bedrock.invoke_model(
-            modelId="amazon.titan-embed-text-v2:0",
-            contentType="application/json",
-            body=json.dumps({
-                "inputText": text
-            })
-        )
-
-        body = json.loads(
-            response["body"].read()
-        )
-
-        return body.get(
-            "embedding",
-            []
-        )
-    
-    async def _normalize_vector(self, vec):
-        """L2-normalize a vector so its magnitude becomes 1"""
-        if not vec:
-            raise ValueError("Empty vector cannot be normalized")
-
-        arr = np.array(vec, dtype=np.float32)
-        norm = np.linalg.norm(arr)
-        if norm == 0:
-            return arr.tolist()
-        return (arr / norm).tolist()
+        return await asyncio.to_thread(embed_text, text)
 
     async def retrieve_relevant_docs(self, orgid: str, query: str, course_id: str, k: int) -> list[dict]:
 
@@ -232,12 +205,22 @@ class RagService:
             if not embedding:
                 return []
 
-            results = self.index.query(
-                vector= await self._normalize_vector(embedding),
-                top_k=k,
-                include_metadata=True,
-                filter={"course_id": str(course_id)}
+            response = await asyncio.to_thread(
+                get_qdrant_client().query_points,
+                collection_name=QDRANT_COLLECTION,
+                query=normalize_vector(embedding),
+                limit=k,
+                query_filter=Filter(
+                    must=[FieldCondition(
+                        key="course_id",
+                        match=MatchValue(value=str(course_id)),
+                    )]
+                ),
+                with_payload=True,
             )
+            results = response.points
+            print(f"Vector search results for query '{query}': {results}")
+
 
         except Exception as e:
             raise HTTPException(
@@ -245,15 +228,15 @@ class RagService:
                 detail=f"Vector search failed: {str(e)}"
             )
 
-        if not results.matches:
+        if not results:
             return []
 
         chunk_ids = []
 
-        for match in results.matches:
-            metadata = match.get("metadata", {})
+        for point in results:
+            payload = point.payload or {}
 
-            chunk_id = metadata.get("chunk_id")
+            chunk_id = payload.get("chunk_id")
 
             if chunk_id:
                 chunk_ids.append(UUID(chunk_id))
@@ -264,8 +247,9 @@ class RagService:
         docs = await self.course_repository.get_chunk_context(
             chunk_ids
         )
+        print(f"Retrieved documents for chunk IDs {chunk_ids}: {docs}")
 
-        return [
+        data = [
             {
                 "chunk_id": doc["chunk_id"],
                 "relevant_text": doc["chunk_text"],
@@ -273,11 +257,15 @@ class RagService:
                 "module_id": doc["module_id"],
                 "module_name": doc["module_name"],
                 "module_type": doc["module_type"],
+                "module_loc": doc["module_loc"],
                 "course_id": doc["course_id"],
                 "course_name": doc["course_name"],
+                "organization_id": orgid,
             }
             for doc in docs
         ]
+        print(f"Retrieved documents for query '{query}': {data}")
+        return data
 
     def _handle_step_override(self,intent: str,step: str,voice_mode: bool) -> str:
         """
@@ -338,37 +326,35 @@ class RagService:
         if not docs:
             return None
 
-        return docs[0].get("package_name")
+        # The course acts as the "package" the retrieved material belongs to.
+        return docs[0].get("course_name")
 
-    def _build_image_urls(self, doc: dict, organization_id: str, course_id: str) -> list[str]:
+    def _build_image_urls(self, doc: dict) -> list[str]:
         """
-        Builds S3 image URLs for a document.
+        Build S3 image URLs for a chunk, mirroring the ingestion layout:
+            material/{org}/{type}/{course}/{module}/images/{key}
+        (see workers/extractors/*.py). image_keys come from Chunk.imgkeys.
         """
 
-        image_keys = doc.get("imageKeys") or []
-        extension = (doc.get("fileName") or "").split(".")[-1]
-
+        image_keys = doc.get("image_keys") or []
         if not image_keys:
             return []
 
-        course_id_clean = course_id.replace("COURSE#", "")
-        document_id_clean = (doc.get("document_id") or "").replace("DOC#", "")
+        org_id = doc.get("organization_id", "")
+        course_id = str(doc.get("course_id", ""))
+        module_id = str(doc.get("module_id", ""))
+        module_type = (doc.get("module_type") or "").lower()
 
-        image_tags = []
-
-        for img in image_keys:
-            full_path = (
-                f"{self.s3_base_url}/material/"
-                f"{organization_id}/{extension}/"
-                f"{course_id_clean}/{document_id_clean}/images/{img}"
-            )
-            image_tags.append(full_path)
-
-        return image_tags
+        return [
+            f"{self.s3_base_url}/material/{org_id}/{module_type}/"
+            f"{course_id}/{module_id}/images/{img}"
+            for img in image_keys
+        ]
 
     def _build_rag_context(self, docs: list[dict]) -> str:
         """
-        Converts retrieved docs into LLM-readable context block.
+        Converts retrieved docs into an LLM-readable context block using the
+        fields actually available from Postgres (module + course + chunk text).
         """
 
         if not docs:
@@ -379,84 +365,58 @@ class RagService:
         for doc in docs:
             block = f"""
                 SOURCE
-                Document: {doc.get('fileName')}
-                Document_Description: {doc.get('description', '')}
-                Page: {doc.get('slide_index')}
-                Title: {doc.get('slide_title')}
+                Module: {doc.get('module_name')}
+                Type: {doc.get('module_type')}
+                Course: {doc.get('course_name')}
                 Text: {doc.get('relevant_text', '')}
             """
 
-            images = self._build_image_urls(
-                doc,
-                doc.get("organization_id", ""),
-                doc.get("course_id", "")
-            )
-
+            images = self._build_image_urls(doc)
             if images:
                 block += "\nImages:\n" + "\n".join(images)
-            else:
-                block += "\n\n Image URLs: \n" + f"\n [No images found for this slide {slide_index}]."
 
             stringified_doc_list.append(block)
 
         return "\n\n".join(stringified_doc_list)
-    
-    def _build_citation_html(self,docs: list[dict],package_name: str | None) -> str:
+
+    def _build_citation_html(self, docs: list[dict], package_name: str | None) -> str:
         """
-        Builds HTML citation block from retrieved documents.
+        Builds an HTML citation block from retrieved documents, grouped by module.
+        Links to the module's stored location (Module.loc) when available.
         """
 
-        if not docs or not package_name:
+        if not docs:
             return ""
 
-        file_citations = {}
-
+        # Group by module name, keeping the first known location for each.
+        modules: dict[str, str | None] = {}
         for doc in docs:
-            file_name = doc.get("fileName")
-            if not file_name:
+            name = doc.get("module_name")
+            if not name:
                 continue
+            modules.setdefault(name, doc.get("module_loc"))
 
-            entry = file_citations.setdefault(file_name, {
-                "file_url": f"{self.s3_base_url}/{doc.get('s3Location')}",
-                "pages": set(),
-                "modules": set(),
-            })
-
-            if doc.get("slide_index"):
-                entry["pages"].add(int(doc["slide_index"]))
-
-            if doc.get("slide_title"):
-                entry["modules"].add(doc["slide_title"])
+        if not modules:
+            return ""
 
         citation_blocks = []
+        for name, loc in modules.items():
+            if loc:
+                citation_blocks.append(
+                    f'<strong>File:</strong> '
+                    f'<a href="{loc}" target="_blank">{name}</a>'
+                )
+            else:
+                citation_blocks.append(f"<strong>File:</strong> {name}")
 
-        for file_name, entry in file_citations.items():
-
-            final_url = entry["file_url"]
-
-            pages = sorted(entry["pages"])
-            modules = sorted(entry["modules"])
-
-            if pages:
-                final_url = f"{final_url}#page={pages[0]}"
-
-            details = ""
-
-            if modules:
-                details = f"Modules: {', '.join(modules)}"
-            elif pages:
-                details = f"Pages: {', '.join(map(str, pages))}"
-
-            citation_blocks.append(f"""
-                    <strong>File:</strong>
-                    <a href="{final_url}" target="_blank">{file_name}</a><br/>
-                    {details}
-                """)
+        package_line = (
+            f"<em>Information taken from {package_name}</em><br/><br/>"
+            if package_name else ""
+        )
 
         return f"""
             <div class="citations" style="margin-top:10px;font-size:small;font-style:italic;">
-            <em>Information taken from {package_name}</em><br/><br/>
-            {"<br/><br/>".join(citation_blocks)}
+            {package_line}{"<br/><br/>".join(citation_blocks)}
             </div>
         """
  
