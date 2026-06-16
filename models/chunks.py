@@ -7,7 +7,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
 )
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID, ARRAY
 from sqlalchemy.sql import func
 
 from core.db import Base
@@ -67,5 +67,11 @@ class Chunk(Base):
     updby = Column(
         UUID(as_uuid=True),
         ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    
+    
+    imgkeys = Column(
+        ARRAY(Text),
         nullable=True,
     )
