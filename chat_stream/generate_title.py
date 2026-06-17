@@ -1,4 +1,5 @@
 from core.llm import generate
+from core.config import settings
 
 
 async def generate_chat_title(user_message: str, initial_message: str):
@@ -46,6 +47,7 @@ Lira's Initial Welcome Message:
         max_tokens=50,
         temperature=0,
         json_schema=schema,
+        model=settings.OLLAMA_FAST_MODEL,
     )
 
     return output

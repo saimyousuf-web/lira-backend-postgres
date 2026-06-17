@@ -27,8 +27,13 @@ class Settings(BaseSettings):
     S3_BASE_FILE_URL: str | None = None
     # --- Ollama (local LLM) ---
     OLLAMA_BASE_URL: str = "http://localhost:11434"
-    OLLAMA_MODEL: str = "llama3.2:3b"
+    OLLAMA_MODEL: str = "llama3.1:8b"          # main answer (quality)
+    OLLAMA_FAST_MODEL: str = "llama3.2:3b"     # helper calls: title + analysis (speed)
     # --- Local embeddings ---
     EMBEDDING_MODEL: str = "BAAI/bge-large-en-v1.5"
+    # --- Embedding provider per role (for A/B/C eval): "bge" | "titan" ---
+    INGEST_EMBED_PROVIDER: str = "bge"
+    QUERY_EMBED_PROVIDER: str = "bge"
+    TITAN_EMBED_MODEL: str = "amazon.titan-embed-text-v2:0"
 
 settings = Settings()

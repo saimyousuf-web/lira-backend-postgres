@@ -1,4 +1,5 @@
 from core.llm import generate
+from core.config import settings
 
 
 async def analyze_user_message(user_message: str, context_history: str, coach_mode: bool, step:str, voice_mode: bool):
@@ -196,6 +197,7 @@ Chat History:
         max_tokens=600,
         temperature=0,
         json_schema=schema,
+        model=settings.OLLAMA_FAST_MODEL,
       )
 
       return output
@@ -246,6 +248,7 @@ Chat History:
         max_tokens=200,
         temperature=0,
         json_schema=schema,
+        model=settings.OLLAMA_FAST_MODEL,
       )
 
       return output

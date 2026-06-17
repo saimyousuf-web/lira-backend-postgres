@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 from typing import List, Dict, Optional
 import asyncio
+import traceback
 from datetime import datetime
 import uuid
 from core.db import get_db_session
@@ -55,10 +56,16 @@ async def stream_chat(
         feedback_repo=feedback_repo,
     )
 
-    result = await rag_service.execute(
-        data = data,
-        user=user
-    )
+    try:
+        result = await rag_service.execute(
+            data = data,
+            user=user
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"/rag failed: {e!r}")
 
     return result
 

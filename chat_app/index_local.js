@@ -1,47 +1,87 @@
 import { PollyClient, SynthesizeSpeechCommand } from "@aws-sdk/client-polly";
 import express from "express";
+import http from "node:http";
 
 const PYTHON_RAG_URL = process.env.PYTHON_RAG_URL || 'http://127.0.0.1:8000/rag' || "http://localhost:8000/rag";
 const PYTHON_SAVE_URL = process.env.PYTHON_SAVE_URL || 'http://127.0.0.1:8000/rag/save' || "http://localhost:8000/rag/save";
 const POLLY_VOICE = process.env.POLLY_VOICE || "Stephen";
 const AWS_REGION = process.env.AWS_REGION || "us-east-1";
 const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL || "http://localhost:11434";
-const OLLAMA_MODEL = process.env.OLLAMA_MODEL || "llama3.2:3b";
+const OLLAMA_MODEL = process.env.OLLAMA_MODEL || "llama3.1:8b";
 
 /* ---------------- AWS CLIENTS ---------------- */
 const polly = new PollyClient({ region: AWS_REGION });
 
 /* ---------------- OLLAMA STREAM HELPER ---------------- */
-async function* streamOllamaTokens(prompt) {
-  const res = await fetch(`${OLLAMA_BASE_URL}/api/chat`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: OLLAMA_MODEL,
-      stream: true,
-      options: { temperature: 0.4, num_predict: 4096 },
-      messages: [{ role: "user", content: prompt }],
-    }),
+// Uses the built-in http module (not fetch) because llama3.1:8b on CPU can take
+// longer to evaluate a large prompt than undici's default headers timeout allows,
+// which made fetch abort with UND_ERR_HEADERS_TIMEOUT before the first token.
+function postOllamaStream(payload) {
+  return new Promise((resolve, reject) => {
+    const url = new URL(`${OLLAMA_BASE_URL}/api/chat`);
+    const req = http.request(
+      {
+        hostname: url.hostname,
+        port: url.port || 80,
+        path: url.pathname,
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      },
+      (res) => resolve(res),
+    );
+    req.on("error", reject);
+    req.setTimeout(0); // wait as long as needed for the first byte (prompt eval)
+    req.write(JSON.stringify(payload));
+    req.end();
+  });
+}
+
+async function* streamOllamaTokens(prompt, userMessage) {
+  const res = await postOllamaStream({
+    model: OLLAMA_MODEL,
+    stream: true,
+    options: { temperature: 0.4, num_predict: 4096 },
+    messages: [
+      { role: "system", content: prompt },
+      { role: "user", content: userMessage || "Please respond per the instructions above." },
+    ],
   });
 
-  if (!res.ok || !res.body) throw new Error("Ollama request failed");
+  if (res.statusCode !== 200) {
+    let errBody = "";
+    for await (const c of res) errBody += c.toString("utf8");
+    throw new Error(`Ollama request failed: ${res.statusCode} ${errBody}`);
+  }
 
-  const decoder = new TextDecoder();
   let lineBuffer = "";
+  let tokenCount = 0;
 
-  for await (const chunk of res.body) {
-    lineBuffer += decoder.decode(chunk, { stream: true });
+  for await (const chunk of res) {
+    lineBuffer += chunk.toString("utf8");
     const lines = lineBuffer.split("\n");
     lineBuffer = lines.pop() ?? "";
 
     for (const line of lines) {
       const trimmed = line.trim();
       if (!trimmed) continue;
-      const parsed = JSON.parse(trimmed);
+      let parsed;
+      try {
+        parsed = JSON.parse(trimmed);
+      } catch (e) {
+        console.error("[ollama] non-JSON line:", trimmed);
+        continue;
+      }
+      if (parsed.error) {
+        throw new Error(`Ollama error: ${parsed.error}`);
+      }
       const token = parsed.message?.content || "";
-      if (token) yield token;
+      if (token) {
+        tokenCount++;
+        yield token;
+      }
     }
   }
+  console.log(`[ollama] stream finished, tokens yielded: ${tokenCount}`);
 }
 
 /* ---------------- EXPRESS ---------------- */
@@ -126,6 +166,7 @@ app.post("/stream", async (req, res) => {
     data = Array.isArray(data) ? data[0] : data;
 
     const prompt = data?.streaming_metadata?.prompt;
+    const user_message = data?.streaming_metadata?.user_message;
     let voice_mode = data?.streaming_metadata?.voice_mode;
     const storage_metadata = data?.storage_metadata;
 
@@ -164,7 +205,7 @@ app.post("/stream", async (req, res) => {
 
       let textBuffer = "";
 
-      for await (const token of streamOllamaTokens(prompt)) {
+      for await (const token of streamOllamaTokens(prompt, user_message)) {
         textBuffer += token;
         fullResponse += token;
 
@@ -209,7 +250,7 @@ app.post("/stream", async (req, res) => {
 
       let buffer = "";
 
-      for await (const token of streamOllamaTokens(prompt)) {
+      for await (const token of streamOllamaTokens(prompt, user_message)) {
         buffer += token;
         fullResponse += token;
 

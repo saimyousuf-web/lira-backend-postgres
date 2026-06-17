@@ -4,7 +4,7 @@ from typing import List, Dict, Any
 import asyncio
 from qdrant_client.models import Filter, FieldCondition, MatchValue
 from core.config import settings
-from core.embeddings import embed_text
+from core.embeddings import embed_query
 from workers.qdrnt_vector import get_qdrant_client, QDRANT_COLLECTION, normalize_vector
 
 
@@ -85,11 +85,11 @@ class RagService:
 
         top_k = self._get_top_k(intent, coach_mode, voice_mode, step)
 
-        docs_task = self.retrieve_relevant_docs(organization_id, query, course_id, top_k)
-        
-        feedback_task = self.feedback_repo.get_top_feedbacks(organization_id, course_id)
+        # Run sequentially, not via asyncio.gather: both touch the same AsyncSession,
+        # which is not safe for concurrent use.
+        docs = await self.retrieve_relevant_docs(organization_id, query, course_id, top_k)
 
-        docs, feedback = await asyncio.gather(docs_task, feedback_task)
+        feedback = await self.feedback_repo.get_top_feedbacks(organization_id, course_id)
 
         package_name = self._extract_package_name(docs)
 
@@ -136,6 +136,7 @@ class RagService:
         obj = {
             "streaming_metadata": {
                 "prompt": prompt,
+                "user_message": user_message,
                 "voice_mode": voice_mode
             },
             "storage_metadata": {
@@ -170,10 +171,11 @@ class RagService:
             full_response,
         )
 
-        await asyncio.gather(
-            self.conversation_service.update_step(conversation_id, step),
-            self.conversation_service.save_message_cache(conversation_id, user_id, 'BOT', full_response,)
-        )
+        # These share one AsyncSession, which is NOT safe for concurrent use,
+        # so run them sequentially (asyncio.gather here triggers
+        # "concurrent operations are not permitted").
+        await self.conversation_service.update_step(conversation_id, step)
+        await self.conversation_service.save_message_cache(conversation_id, user_id, 'BOT', full_response,)
 
 
         return {"message": "saved success"}
@@ -195,7 +197,7 @@ class RagService:
 
 
     async def _generate_embedding(self,text: str,) -> list[float]:
-        return await asyncio.to_thread(embed_text, text)
+        return await asyncio.to_thread(embed_query, text)
 
     async def retrieve_relevant_docs(self, orgid: str, query: str, course_id: str, k: int) -> list[dict]:
 
@@ -223,6 +225,8 @@ class RagService:
 
 
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             raise HTTPException(
                 status_code=500,
                 detail=f"Vector search failed: {str(e)}"

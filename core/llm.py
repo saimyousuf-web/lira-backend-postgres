@@ -31,18 +31,21 @@ async def generate(
     max_tokens: int = 512,
     temperature: float = 0.0,
     json_schema: Optional[dict] = None,
-    timeout: float = 120.0,
+    timeout: float = 300.0,
+    model: Optional[str] = None,
 ) -> Any:
     """
     Call Ollama's /api/chat (non-streaming).
 
+    - `model` defaults to settings.OLLAMA_MODEL; pass settings.OLLAMA_FAST_MODEL for
+      lightweight helper calls (title/analysis) that don't need the main model.
     - If `json_schema` is provided, Ollama is asked to constrain output to that
       schema (via the `format` parameter), the reply is parsed as JSON, validated
       to contain the schema's required keys, and retried once on failure. Returns a dict.
     - Otherwise returns the raw assistant text (str).
     """
     payload: dict = {
-        "model": settings.OLLAMA_MODEL,
+        "model": model or settings.OLLAMA_MODEL,
         "messages": _build_messages(prompt, system),
         "stream": False,
         "options": {

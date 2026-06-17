@@ -25,7 +25,8 @@ from sqlalchemy import select
 from qdrant_client.models import PointStruct, VectorParams, Distance
 
 from core.db import AsyncSessionLocal
-from core.embeddings import embed_texts
+from core.config import settings
+from core.embeddings import embed_docs
 from models.chunks import Chunk
 from models.course import Course
 from workers.qdrnt_vector import (
@@ -33,6 +34,7 @@ from workers.qdrnt_vector import (
     QDRANT_COLLECTION,
     VECTOR_DIM,
     normalize_vector,
+    ensure_payload_indexes,
 )
 
 BATCH_SIZE = 100
@@ -61,7 +63,7 @@ def _reindex(rows) -> int:
         batch = rows[start:start + BATCH_SIZE]
         texts = [row[4] or "" for row in batch]
 
-        vectors = embed_texts(texts)
+        vectors = embed_docs(texts)
 
         points = []
         for row, vector in zip(batch, vectors):
@@ -102,9 +104,13 @@ def _recreate_collection():
         collection_name=QDRANT_COLLECTION,
         vectors_config=VectorParams(size=VECTOR_DIM, distance=Distance.COSINE),
     )
+    # Required so the query path can filter by course_id (Qdrant rejects
+    # filtering on an unindexed payload field).
+    ensure_payload_indexes()
 
 
 async def main():
+    print(f"INGEST embedding provider: {settings.INGEST_EMBED_PROVIDER}")
     print(f"Recreating Qdrant collection '{QDRANT_COLLECTION}' (unnamed 1024-dim, cosine)...")
     _recreate_collection()
 

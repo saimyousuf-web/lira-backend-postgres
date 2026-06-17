@@ -2,7 +2,7 @@
 const PYTHON_RAG_URL  = "https://ziewv6e9h7.execute-api.us-east-1.amazonaws.com/rag";
 const PYTHON_SAVE_URL = "https://ziewv6e9h7.execute-api.us-east-1.amazonaws.com/rag/save";
 const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL || "http://localhost:11434";
-const OLLAMA_MODEL    = process.env.OLLAMA_MODEL || "llama3.2:3b";
+const OLLAMA_MODEL    = process.env.OLLAMA_MODEL || "llama3.1:8b";
 
 /* ---------------- SENTENCE CHUNKING ---------------- */
 
@@ -51,6 +51,7 @@ export const handler = awslambda.streamifyResponse(
 
       const data             = await ragRes.json();
       const prompt           = data?.[0]?.streaming_metadata?.prompt;
+      const user_message     = data?.[0]?.streaming_metadata?.user_message;
       const voice_mode       = data?.[0]?.streaming_metadata?.voice_mode;
       const storage_metadata = data?.[0]?.storage_metadata;
 
@@ -75,7 +76,10 @@ export const handler = awslambda.streamifyResponse(
           model:   OLLAMA_MODEL,
           stream:  true,
           options: { temperature: 0.4, num_predict: 4096 },
-          messages: [{ role: "user", content: prompt }],
+          messages: [
+            { role: "system", content: prompt },
+            { role: "user", content: user_message || "Please respond per the instructions above." },
+          ],
         }),
       });
 

@@ -31,6 +31,24 @@ def ensure_collection_exists():
             collection_name=QDRANT_COLLECTION,
             vectors_config=VectorParams(size=VECTOR_DIM, distance=Distance.COSINE),
         )
+    ensure_payload_indexes()
+
+
+def ensure_payload_indexes():
+    """
+    Qdrant requires a payload index on any field used in a filter. We filter by
+    course_id at query time, so it must be indexed (keyword). Idempotent.
+    """
+    client = get_qdrant_client()
+    try:
+        client.create_payload_index(
+            collection_name=QDRANT_COLLECTION,
+            field_name="course_id",
+            field_schema="keyword",
+        )
+    except Exception:
+        # Index already exists (or collection just created it) — safe to ignore.
+        pass
 
 
 def normalize_vector(vec: list[float]) -> list[float]:
