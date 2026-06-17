@@ -1,12 +1,10 @@
 from uuid import UUID, uuid4
 from fastapi import HTTPException
-import boto3
-from pinecone import Pinecone
-import json
 from typing import List, Dict, Any
 import asyncio
 import numpy as np
 from core.config import settings
+from core.embeddings import embed_text
 
 
 from chat_stream.utils.user_message_analyzer import analyze_user_message
@@ -36,9 +34,8 @@ class RagService:
         self.conversation_service = conversation_service
         self.feedback_repo = feedback_repo
         self.s3_base_url = settings.S3_BUCKET_NAME
-        self.bedrock = boto3.client("bedrock-runtime",region_name=settings.REGION)
-        
-        self.QDRANT_URL        = settings.QDRANT_URL     
+
+        self.QDRANT_URL        = settings.QDRANT_URL
         self.QDRANT_API_KEY    = settings.QDRANT_API_KEY   
         self.QDRANT_COLLECTION = settings.QDRANT_COLLECTION
         self.VECTOR_DIM        = 1024  
@@ -138,6 +135,7 @@ class RagService:
         return {
             "streaming_metadata": {
                 "prompt": prompt,
+                "user_message": user_message,
                 "voice_mode": voice_mode
             },
             "storage_metadata": {
@@ -184,22 +182,7 @@ class RagService:
         return messages or []
 
     async def _generate_embedding(self,text: str,) -> list[float]:
-        response = self.bedrock.invoke_model(
-            modelId="amazon.titan-embed-text-v2:0",
-            contentType="application/json",
-            body=json.dumps({
-                "inputText": text
-            })
-        )
-
-        body = json.loads(
-            response["body"].read()
-        )
-
-        return body.get(
-            "embedding",
-            []
-        )
+        return await asyncio.to_thread(embed_text, text)
     
     async def _normalize_vector(self, vec):
         """L2-normalize a vector so its magnitude becomes 1"""

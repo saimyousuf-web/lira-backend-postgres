@@ -1,15 +1,70 @@
-import {
-  BedrockRuntimeClient,
-  InvokeModelWithResponseStreamCommand,
-} from "@aws-sdk/client-bedrock-runtime";
+import http from "node:http";
 
 /* ---------------- ENV ---------------- */
 const PYTHON_RAG_URL  = "https://ziewv6e9h7.execute-api.us-east-1.amazonaws.com/rag";
 const PYTHON_SAVE_URL = "https://ziewv6e9h7.execute-api.us-east-1.amazonaws.com/rag/save";
-const AWS_REGION      = "us-east-1";
+const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL || "http://localhost:11434";
+const OLLAMA_MODEL    = process.env.OLLAMA_MODEL || "llama3.1:8b";
 
-/* ---------------- AWS CLIENT ---------------- */
-const bedrockClient = new BedrockRuntimeClient({ region: AWS_REGION });
+/* ---------------- OLLAMA STREAM HELPER ---------------- */
+function postOllamaStream(payload) {
+  return new Promise((resolve, reject) => {
+    const url = new URL(`${OLLAMA_BASE_URL}/api/chat`);
+    const req = http.request(
+      {
+        hostname: url.hostname,
+        port: url.port || 80,
+        path: url.pathname,
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      },
+      (res) => resolve(res),
+    );
+    req.on("error", reject);
+    req.setTimeout(0);
+    req.write(JSON.stringify(payload));
+    req.end();
+  });
+}
+
+async function* streamOllamaTokens(prompt, userMessage) {
+  const res = await postOllamaStream({
+    model: OLLAMA_MODEL,
+    stream: true,
+    options: { temperature: 0.4, num_predict: 4096 },
+    messages: [
+      { role: "system", content: prompt },
+      { role: "user", content: userMessage || "Please respond per the instructions above." },
+    ],
+  });
+
+  if (res.statusCode !== 200) {
+    let errBody = "";
+    for await (const c of res) errBody += c.toString("utf8");
+    throw new Error(`Ollama request failed: ${res.statusCode} ${errBody}`);
+  }
+
+  let lineBuffer = "";
+  for await (const chunk of res) {
+    lineBuffer += chunk.toString("utf8");
+    const lines = lineBuffer.split("\n");
+    lineBuffer = lines.pop() ?? "";
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      let parsed;
+      try {
+        parsed = JSON.parse(trimmed);
+      } catch (e) {
+        console.error("[ollama] non-JSON line:", trimmed);
+        continue;
+      }
+      if (parsed.error) throw new Error(`Ollama error: ${parsed.error}`);
+      const token = parsed.message?.content || "";
+      if (token) yield token;
+    }
+  }
+}
 
 /* ---------------- SENTENCE CHUNKING ---------------- */
 
@@ -58,6 +113,7 @@ export const handler = awslambda.streamifyResponse(
 
       const data             = await ragRes.json();
       const prompt           = data?.[0]?.streaming_metadata?.prompt;
+      const user_message     = data?.[0]?.streaming_metadata?.user_message;
       const voice_mode       = data?.[0]?.streaming_metadata?.voice_mode;
       const storage_metadata = data?.[0]?.storage_metadata;
 
@@ -74,23 +130,7 @@ export const handler = awslambda.streamifyResponse(
         },
       });
 
-      /* 3. Bedrock */
-      const command = new InvokeModelWithResponseStreamCommand({
-        modelId:     "us.anthropic.claude-haiku-4-5-20251001-v1:0",
-        contentType: "application/json",
-        accept:      "application/json",
-        body: JSON.stringify({
-          anthropic_version: "bedrock-2023-05-31",
-          max_tokens:        4096,
-          temperature:       0.4,
-          messages: [
-            { role: "user", content: [{ type: "text", text: prompt }] },
-          ],
-        }),
-      });
-
-      const response   = await bedrockClient.send(command);
-      const decoder    = new TextDecoder();
+      /* 3. Ollama (local LLM, streaming) */
       let fullResponse = "";
       let textBuffer   = "";
 
@@ -99,28 +139,17 @@ export const handler = awslambda.streamifyResponse(
         message_id: storage_metadata?.message_id,
       });
 
-      for await (const streamEvent of response.body) {
-        const chunk = streamEvent.chunk;
-        if (!chunk) continue;
+      for await (const token of streamOllamaTokens(prompt, user_message)) {
+        textBuffer   += token;
+        fullResponse += token;
 
-        const parsed = JSON.parse(decoder.decode(chunk.bytes, { stream: true }));
+        // Always stream raw token so FE can render text in real time
+        writeLine(responseStream, { type: "text", text: token });
 
-        if (
-          parsed.type === "content_block_delta" &&
-          parsed.delta?.type === "text_delta"
-        ) {
-          const token   = parsed.delta.text;
-          textBuffer   += token;
-          fullResponse += token;
-
-          // Always stream raw token so FE can render text in real time
-          writeLine(responseStream, { type: "text", text: token });
-
-          // In voice mode, also emit a completed sentence for FE TTS
-          if (voice_mode && shouldFlush(textBuffer)) {
-            writeLine(responseStream, { type: "sentence", text: textBuffer.trim() });
-            textBuffer = "";
-          }
+        // In voice mode, also emit a completed sentence for FE TTS
+        if (voice_mode && shouldFlush(textBuffer)) {
+          writeLine(responseStream, { type: "sentence", text: textBuffer.trim() });
+          textBuffer = "";
         }
       }
 

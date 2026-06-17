@@ -1,10 +1,5 @@
-import json
-import boto3
+from core.llm import generate
 from core.config import settings
-import asyncio
-
-bedrock = boto3.client("bedrock-runtime", region_name=settings.REGION)
-
 
 
 async def analyze_user_message(user_message: str, context_history: str, coach_mode: bool, step:str, voice_mode: bool):
@@ -149,79 +144,64 @@ Chat History:
     
 
 
-      native_request = {
-        "anthropic_version": "bedrock-2023-05-31",
-        "max_tokens": 600,
-        "temperature": 0,
-        "messages": [
-            {
-                "role": "user",
-                "content": [{"type": "text", "text": prompt}]
+      schema = {
+        "type": "object",
+        "properties": {
+            "intent": {
+                "type": "string",
+                "enum": [
+                    "clarify_needed",
+                    "simple_fact_question",
+                    "domain_question",
+                    "troubleshoot_issue",
+                    "follow_up_question",
+                    "redo_assessment",
+                    "reflection_request",
+                    "goal_setting",
+                    "out_of_scope",
+                    "chit_chat"
+                ]
+            },
+            "decision_mode": {
+                "type": "string",
+                "enum": [
+                    "factual_mode",
+                    "explanatory_mode",
+                    "interpretive_mode",
+                    "judgment_mode",
+                    "action_guidance_mode",
+                    "reflective_mode",
+                    "risk_evaluation_mode",
+                    "option_comparison_mode",
+                    "constraint_check_mode",
+                    "recommendation_mode",
+                    "scenario_analysis_mode",
+                    "decision_review_mode",
+                    "out_of_scope_mode"
+                ]
+            },
+            "search_query": {
+                "type": "string"
             }
+        },
+        "required": [
+            "intent",
+            "decision_mode",
+            "search_query"
         ],
-        "output_config": {
-            "format": {
-                "type": "json_schema",
-                "schema": {
-                    "type": "object",
-                    "properties": {
-                        "intent": {
-                            "type": "string",
-                            "enum": [
-                                "clarify_needed",
-                                "simple_fact_question",
-                                "domain_question",
-                                "troubleshoot_issue",
-                                "follow_up_question",
-                                "redo_assessment",
-                                "reflection_request",
-                                "goal_setting",
-                                "out_of_scope",
-                                "chit_chat"
-                            ]
-                        },
-                        "decision_mode": {
-                            "type": "string",
-                            "enum": [
-                                "factual_mode",
-                                "explanatory_mode",
-                                "interpretive_mode",
-                                "judgment_mode",
-                                "action_guidance_mode",
-                                "reflective_mode",
-                                "risk_evaluation_mode",
-                                "option_comparison_mode",
-                                "constraint_check_mode",
-                                "recommendation_mode",
-                                "scenario_analysis_mode",
-                                "decision_review_mode",
-                                "out_of_scope_mode"
-                            ]
-                        },
-                        "search_query": {
-                            "type": "string"
-                        }
-                    },
-                    "required": [
-                        "intent",
-                        "decision_mode",
-                        "search_query"
-                    ],
-                    "additionalProperties": False
-                }
-            }
-        }
-    }
-      response = await asyncio.to_thread(
-      bedrock.invoke_model,
-      modelId="us.anthropic.claude-haiku-4-5-20251001-v1:0",
-      body=json.dumps(native_request))
+        "additionalProperties": False
+      }
 
-      model_response = json.loads(response["body"].read())
-      output = json.loads(model_response["content"][0]["text"])
+      output = await generate(
+        prompt=prompt,
+        max_tokens=600,
+        temperature=0,
+        json_schema=schema,
+        model=settings.OLLAMA_FAST_MODEL,
+      )
 
       return output
-    
+
     else:
 
       prompt = f"""
@@ -252,39 +232,23 @@ User Message:
 Chat History:
 {context_history}
 """
-      native_request = {
-        "anthropic_version": "bedrock-2023-05-31",
-        "max_tokens": 200,
-        "temperature": 0,
-        "messages": [
-            {
-                "role": "user",
-                "content": [{"type": "text", "text": prompt}]
+      schema = {
+        "type": "object",
+        "properties": {
+            "search_query": {
+                "type": "string"
             }
-        ],
-        "output_config": {
-           "format": {
-        "type": "json_schema",
-        "schema": {
-            "type": "object",
-            "properties": {
-                "search_query": {
-                    "type": "string"
-                }
-            },
-            "required": ["search_query"],
-            "additionalProperties": False
-        }
-        }
-    }
+        },
+        "required": ["search_query"],
+        "additionalProperties": False
       }
 
-      response = await asyncio.to_thread(
-      bedrock.invoke_model,
-      modelId="us.anthropic.claude-haiku-4-5-20251001-v1:0",
-      body=json.dumps(native_request))
-
-      model_response = json.loads(response["body"].read())
-      output = json.loads(model_response["content"][0]["text"])
+      output = await generate(
+        prompt=prompt,
+        max_tokens=200,
+        temperature=0,
+        json_schema=schema,
+        model=settings.OLLAMA_FAST_MODEL,
+      )
 
       return output

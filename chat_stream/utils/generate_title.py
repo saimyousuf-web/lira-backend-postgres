@@ -1,9 +1,5 @@
-import json
-import boto3
+from core.llm import generate
 from core.config import settings
-import asyncio
-
-bedrock = boto3.client("bedrock-runtime", region_name=settings.REGION)
 
 
 async def generate_chat_title(user_message: str, initial_message: str):
@@ -37,40 +33,21 @@ Lira's Initial Welcome Message:
 {initial_message}
 """
 
-    native_request = {
-        "anthropic_version": "bedrock-2023-05-31",
-        "max_tokens": 50,
-        "temperature": 0,
-        "messages": [
-            {
-                "role": "user",
-                "content": [{"type": "text", "text": prompt}]
-            }
-        ],
-        "output_config": {
-            "format": {
-                "type": "json_schema",
-                "schema": {
-                    "type": "object",
-                    "properties": {
-                        "chat_title": {
-                            "type": "string"
-                        }
-                    },
-                    "required": ["chat_title"],
-                    "additionalProperties": False
-                }
-            }
-        }
+    schema = {
+        "type": "object",
+        "properties": {
+            "chat_title": {"type": "string"}
+        },
+        "required": ["chat_title"],
+        "additionalProperties": False,
     }
 
-    response = await asyncio.to_thread(
-        bedrock.invoke_model,
-        modelId="us.anthropic.claude-haiku-4-5-20251001-v1:0",
-        body=json.dumps(native_request)
+    output = await generate(
+        prompt=prompt,
+        max_tokens=50,
+        temperature=0,
+        json_schema=schema,
+        model=settings.OLLAMA_FAST_MODEL,
     )
-
-    model_response = json.loads(response["body"].read())
-    output = json.loads(model_response["content"][0]["text"])
 
     return output

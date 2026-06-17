@@ -18,7 +18,7 @@ from sqlalchemy import select
 from models.chunks import Chunk
 from models.module import Module
 from models.course_module import CourseModule
-from workers.vector import bedrock_client, normalize_vector
+from workers.vector import generate_embedding, normalize_vector
 from qdrant_client.models import PointStruct
 from workers.qdrnt_vector import get_qdrant_client, QDRANT_COLLECTION
 
@@ -104,17 +104,11 @@ def _embed_and_upsert_qdrant(
     module_id: uuid.UUID,
 ) -> tuple[str, int]:
     """
-    Embed a single chunk with Amazon Titan and upsert into Qdrant.
+    Embed a single chunk with bge-large-en-v1.5 and upsert into Qdrant.
     Returns (embedding_status, embedding_dim).
     """
     try:
-        response = bedrock_client.invoke_model(
-            modelId="amazon.titan-embed-text-v2:0",
-            contentType="application/json",
-            body=json.dumps({"inputText": text}),
-        )
-        body = json.loads(response["body"].read())
-        embedding = body.get("embedding")
+        embedding = generate_embedding(text)
 
         if not (isinstance(embedding, list) and len(embedding) == 1024):
             return "failed", 0
