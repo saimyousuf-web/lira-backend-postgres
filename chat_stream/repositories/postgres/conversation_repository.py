@@ -79,7 +79,6 @@ class PostgresConversationRepository(ConversationRepository):
         
         return None
 
-
     async def create_message( # message stored at session table
         self,
         conversation_id: UUID,
@@ -102,7 +101,6 @@ class PostgresConversationRepository(ConversationRepository):
         await self.db.refresh(db_message)
 
         return db_message
-
 
     async def get_recent_messages(
         self,
@@ -127,7 +125,6 @@ class PostgresConversationRepository(ConversationRepository):
 
         return list(reversed(messages))
 
-    
     async def increment_message_count(self, conversation_id: UUID):
         await self.db.execute(
             update(Conversation)
@@ -157,5 +154,44 @@ class PostgresConversationRepository(ConversationRepository):
         updated = result.scalar_one_or_none()
         return updated
 
+    async def get_chunk_context(self, chunk_ids: list[UUID],) -> list[dict]:
+        
+        try:
+            if not chunk_ids:
+                return []
 
+            result = await self.db.execute(
+                select(
+                    Chunk.id.label("chunk_id"),
+                    Chunk.txt.label("chunk_text"),
+                    Chunk.imgkeys.label("image_keys"),
+
+                    Module.id.label("module_id"),
+                    Module.nm.label("fileName"),
+                    Module.ty.label("module_type"),
+                    Module.loc.label("s3Location"),
+                    
+                    Course.id.label("course_id"),
+                    Course.nm.label("course_name"),
+                )
+                .join(
+                    Module,
+                    Chunk.moid == Module.id
+                )
+                .join(
+                    Course,
+                    Chunk.cid == Course.id
+                )
+                .where(
+                    Chunk.id.in_(chunk_ids)
+                )
+            )
+
+            rows = result.mappings().all()
+            res = [dict(row) for row in rows]
+            return res
+            
+        except Exception as e:
+             return []
+        
 

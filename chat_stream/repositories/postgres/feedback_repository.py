@@ -31,12 +31,6 @@ class PostgresFeedbackRepository(FeedbackRepository):
 
             # returns list of strings instead of full objects
             res = result.scalars().all()
-            
-            print('----------------- chat_history -----------\n')
-            print('----------------- chat_history -----------\n')
-            print('----------------- chat_history -----------\n')
-            print('----------------- chat_history -----------\n', res)
-
             return res
 
         except Exception as e:

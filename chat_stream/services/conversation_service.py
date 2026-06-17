@@ -216,3 +216,14 @@ class ConversationService:
         res = await self.conversation_repository.update_message(message, message_id)
         await self.db.commit()
         return res
+    
+    async def get_chunk_context(
+        self,
+        chunk_ids: list[UUID],
+    ):
+        if not chunk_ids:
+            return []
+
+        return await self.conversation_repository.get_chunk_context(
+            chunk_ids
+        )
