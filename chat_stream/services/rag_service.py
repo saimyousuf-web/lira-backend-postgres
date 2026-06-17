@@ -16,6 +16,11 @@ from chat_stream.utils.generate_title import generate_chat_title
 from chat_stream.utils.steps_snippet import get_step_details
 from datetime import datetime
 from core.config import Settings
+
+from qdrant_client.models import Filter, FieldCondition, MatchValue
+from workers.qdrnt_vector import get_qdrant_client, QDRANT_COLLECTION
+from qdrant_client.models import NamedVector
+
 class RagService:
 
     def __init__(
@@ -25,14 +30,19 @@ class RagService:
         conversation_service
 
     ):
+        
+        self.qdrant = get_qdrant_client()
         self.course_repository = course_repo
         self.conversation_service = conversation_service
         self.feedback_repo = feedback_repo
         self.s3_base_url = settings.S3_BUCKET_NAME
         self.bedrock = boto3.client("bedrock-runtime",region_name=settings.REGION)
-        self.pinecone = Pinecone(api_key=settings.PINECONE_API_KEY)
+        
+        self.QDRANT_URL        = settings.QDRANT_URL     
+        self.QDRANT_API_KEY    = settings.QDRANT_API_KEY   
+        self.QDRANT_COLLECTION = settings.QDRANT_COLLECTION
+        self.VECTOR_DIM        = 1024  
 
-        self.index = self.pinecone.Index('lira-vector-index')
 
     # ENTRY POINT
     async def execute(self, user: str,data: dict) -> Dict:
@@ -91,10 +101,9 @@ class RagService:
 
         docs_task = self.retrieve_relevant_docs(organization_id, query, course_id, top_k)
         
-        feedback_task = self.feedback_repo.get_top_feedbacks(organization_id, course_id)
+        feedback = await self.feedback_repo.get_top_feedbacks(organization_id, course_id)
 
-        docs, feedback = await asyncio.gather(docs_task, feedback_task)
-
+        docs = await docs_task
         package_name = self._extract_package_name(docs)
 
         stringified_docs = self._build_rag_context(docs)
@@ -106,15 +115,10 @@ class RagService:
         core_principle = self._get_policy_by_decision_mode(decision_mode)
 
         step_override = self._handle_step_override(intent, step, voice_mode)
-        
-        course = await self.course_repository.get_course(course_id)
+        message = await self.conversation_service.add_message(conversation_id,user_id,'USER',user_message,)
+        await self.conversation_service.get_or_create_conversation(conversation_id, user_id, node_id, course_id, None, user_id, "ACTIVE", step)
 
-        
-        message, _, _ = await asyncio.gather(
-            self.conversation_service.add_message(conversation_id,user_id,'USER',user_message,),
-            self.conversation_service.get_or_create_conversation(conversation_id, user_id, node_id, course_id, None, user_id, "ACTIVE", step),
-            self.conversation_service.save_message_cache(conversation_id, user_id, 'USER', user_message,),
-        )
+        await self.conversation_service.save_message_cache(conversation_id, user_id, 'USER', user_message,)
 
         prompt = getPromptTemplate(
             coach_mode=coach_mode,
@@ -158,17 +162,9 @@ class RagService:
         if not full_response:
             raise HTTPException(status_code=400, detail="Missing full_response")
 
-        message = await self.conversation_service.add_message(
-            conversation_id,
-            user_id,
-            'BOT',
-            full_response,
-        )
-
-        await asyncio.gather(
-            self.conversation_service.update_step(conversation_id, step),
-            self.conversation_service.save_message_cache(conversation_id, user_id, 'BOT', full_response,)
-        )
+        message = await self.conversation_service.add_message(conversation_id, user_id, 'BOT', full_response,)
+        await self.conversation_service.update_step(conversation_id, step),
+        await self.conversation_service.save_message_cache(conversation_id, user_id, 'BOT', full_response,)
 
 
         return {"message": "saved success"}
@@ -176,18 +172,16 @@ class RagService:
     def _build_context(self, chat_history, coach_mode, voice_mode):
         max_history = 20 if coach_mode and not voice_mode else 4
         history_list = list(chat_history) if chat_history else []
-        recent = history_list[-max_history:]if history_list else []        
+        recent = history_list[-max_history:] if history_list else []        
         
         return "\n".join([
             f"{m.sender}: {m.msgtxt}"
             for m in recent
         ])
 
-
     async def get_context_history(self, conversation_id, user_id, limit: int = 20,) -> str:
         messages = await self.conversation_service.get_context(conversation_id, user_id)
         return messages or []
-
 
     async def _generate_embedding(self,text: str,) -> list[float]:
         response = self.bedrock.invoke_model(
@@ -226,11 +220,21 @@ class RagService:
             if not embedding:
                 return []
 
-            results = self.index.query(
-                vector= await self._normalize_vector(embedding),
-                top_k=k,
-                include_metadata=True,
-                filter={"course_id": str(course_id)}
+            # collection_info = self.qdrant.get_collection(QDRANT_COLLECTION)
+
+            results = self.qdrant.query_points(
+                collection_name=QDRANT_COLLECTION,
+                limit=k,
+                query= await self._normalize_vector(embedding),
+                query_filter=Filter(
+                    must=[
+                        FieldCondition(
+                            key="course_id",
+                            match=MatchValue(value=str(course_id))
+                        )
+                    ]
+                ),
+                with_payload=True,
             )
 
         except Exception as e:
@@ -239,13 +243,10 @@ class RagService:
                 detail=f"Vector search failed: {str(e)}"
             )
 
-        if not results.matches:
-            return []
-
         chunk_ids = []
 
-        for match in results.matches:
-            metadata = match.get("metadata", {})
+        for match in results.points:
+            metadata = match.payload or {}
 
             chunk_id = metadata.get("chunk_id")
 
@@ -375,10 +376,10 @@ class RagService:
                 SOURCE
                 Document: {doc.get('fileName')}
                 Document_Description: {doc.get('description', '')}
-                Page: {doc.get('slide_index')}
-                Title: {doc.get('slide_title')}
                 Text: {doc.get('relevant_text', '')}
             """
+            # Page: {doc.get('slide_index')}
+            # Title: {doc.get('slide_title')}
 
             images = self._build_image_urls(
                 doc,
@@ -389,7 +390,7 @@ class RagService:
             if images:
                 block += "\nImages:\n" + "\n".join(images)
             else:
-                block += "\n\n Image URLs: \n" + f"\n [No images found for this slide {slide_index}]."
+                block += "\n\n Image URLs: \n" + f"\n [No images found for this slide (...)]."
 
             stringified_doc_list.append(block)
 
