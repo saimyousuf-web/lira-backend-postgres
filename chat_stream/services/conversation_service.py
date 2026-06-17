@@ -21,7 +21,7 @@ class ConversationService:
         self.cache_lock = Lock()
         self.MAX_CACHED_CHATS = 50
 
-    async def create_conversation(
+    async def _create_conversation(
         self,
         conversation_id: UUID,
         uid: UUID,
@@ -68,7 +68,7 @@ class ConversationService:
             if conversation:
                 return conversation
 
-        res = await self.create_conversation(
+        res = await self._create_conversation(
             conversation_id=conversation_id,
             uid=uid,
             ndid=ndid,
@@ -90,6 +90,8 @@ class ConversationService:
             created_by=user_id,
             updated_by=user_id
         )
+        
+        await self.conversation_repository.increment_message_count(conversation_id)
 
         await self.db.commit()
 
@@ -118,26 +120,32 @@ class ConversationService:
         created_by: UUID,
         sts: str,
         step: str,
-        message: str
+        message: str,
+        message_id: UUID
     ):
         await self.validate_conversation_access(conversation_id, uid)
         
-        res = await self.conversation_repository.update_conversation(
+        res = await self.update_message(
             conversation_id=conversation_id,
-            last_message=message,
-            step=step
+            message=message,
+            message_id=message_id,
+            user_id=uid
         )
+        
         if not res:
-            return await self.handle_chat(
+
+            return await self._handle_chat(
                 conversation_id= conversation_id,
                 uid=uid,
                 ndid=ndid,
                 course_id=course_id,
                 title=title,
                 created_by=created_by,
+                updated_by=updated_by,
                 sts=sts,
                 step=step
             )
+            
         await self.db.commit()
         return res
     
@@ -147,7 +155,7 @@ class ConversationService:
         if not conversation:
             raise HTTPException(status_code=404, detail="Conversation not found")
 
-        if conversation.crtby != user_id:
+        if str(conversation.crtby) != str(user_id):
             raise HTTPException(status_code=403, detail="Unauthorized")
 
         return conversation
@@ -175,29 +183,25 @@ class ConversationService:
             raise HTTPException(status_code=500, detail=str(e))
 
     
-    async def handle_chat(self,conversation_id: UUID,uid: UUID,ndid: UUID,course_id: UUID,title: str | None,created_by: UUID,sts: str,step: int,message: str):
+    async def _handle_chat(self,conversation_id: UUID,uid: UUID,ndid: UUID,course_id: UUID,title: str | None,created_by: UUID, updated_by: UUID,sts: str,step: int,message: str):
         try:
-            await self.get_or_create_conversation(
+            await self._create_conversation(
                 conversation_id= conversation_id,
                 uid=uid,
                 ndid=ndid,
                 course_id=course_id,
                 title=title,
                 created_by=created_by,
+                updated_by=updated_by,
                 sts=sts,
                 step=step,
             )
             await self.add_message(
                 conversation_id= conversation_id,
-                uid=uid,
-                ndid=ndid,
-                course_id=course_id,
-                title=title,
+                sender=sender,
+                updated_by=updated_by,
                 created_by=created_by,
-                sts=sts,
-                step=step,
             )
-            await self.db.commit()
         except:
             await self.db.rollback()
             raise
@@ -206,6 +210,9 @@ class ConversationService:
         await self.conversation_repository.update_step(conversation_id, step)
         await self.db.commit()
     
-    async def update_message(self, user_message_checked, message_id, user_id: UUID):
-        await self.conversation_repository.update_message(user_message_checked, message_id, user_id)
+    async def update_message(self, conversation_id: UUID, message: str, message_id: UUID, user_id: UUID):
+        await self.validate_conversation_access(conversation_id, user_id)
+
+        res = await self.conversation_repository.update_message(message, message_id)
         await self.db.commit()
+        return res

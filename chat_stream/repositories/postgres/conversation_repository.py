@@ -5,8 +5,6 @@ from uuid import UUID
 from models.conversation import Conversation
 from models.session import Session
 from chat_stream.repositories.Iconversation import ConversationRepository
-from collections import deque, defaultdict
-from asyncio import Lock
 import asyncio
 from datetime import datetime
 
@@ -69,8 +67,6 @@ class PostgresConversationRepository(ConversationRepository):
             .values(
                 msgtxt=last_message[:100],
                 updat=datetime.utcnow(),
-                # msgnum=Conversation.msgnum + 1,
-                # step=step,
             )
             .returning(Session)
         )
@@ -78,12 +74,7 @@ class PostgresConversationRepository(ConversationRepository):
         result = await self.db.execute(stmt)
         updated = result.scalar_one_or_none()
 
-        if updated:
-            await asyncio.gather(
-                self.update_step(conversation_id, step),
-                self.increment_message_count(conversation_id)
-            )
-            
+        if updated:            
             return updated
         
         return None
@@ -109,8 +100,6 @@ class PostgresConversationRepository(ConversationRepository):
 
         await self.db.flush()
         await self.db.refresh(db_message)
-
-        await self.increment_message_count(conversation_id)
 
         return db_message
 
@@ -153,15 +142,13 @@ class PostgresConversationRepository(ConversationRepository):
             .values(step=step)
         )
 
-    async def update_message(self, user_message_checked: str, message_id: str, user_id: UUID):
+    async def update_message(self, message: str, message_id: UUID):
         stmt = (
             update(Session)
             .where(Session.id == message_id)
             .values(
-                msgtxt=user_message_checked,
+                msgtxt=message,
                 updat=datetime.utcnow(),
-                # msgnum=Conversation.msgnum + 1,
-                # step=step,
             )
             .returning(Session)
         )

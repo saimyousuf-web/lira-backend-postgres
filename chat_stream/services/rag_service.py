@@ -70,7 +70,7 @@ class RagService:
 
             await self.conversation_service.get_or_create_conversation(conversation_id, user_id, node_id, course_id, chat_title["chat_title"], user_id, "ACTIVE", step)
 
-            message = await self.conversation_service.add_message(
+            await self.conversation_service.add_message(
                 conversation_id,
                 user_id,
                 'BOT',
@@ -80,9 +80,14 @@ class RagService:
             conversation = await self.conversation_service.get_conversation(conversation_id)
             step = conversation.step
         if checkboxed_message:
-            await self.conversation_service.update_message(checkboxed_message.get("html"), checkboxed_message.get("key"), user_id)
+            await self.conversation_service.update_conversation(conversation_id, user_id, node_id, course_id, None, user_id, "ACTIVE", step,  checkboxed_message.get("html"), checkboxed_message.get("key") )
 
         chat_history = await self.get_context_history(conversation_id, user_id)
+        
+        print('----------------- chat_history -----------\n')
+        print('----------------- chat_history -----------\n')
+        print('----------------- chat_history -----------\n')
+        print('----------------- chat_history -----------\n', chat_history)
         
         context_history = self._build_context(chat_history, coach_mode, voice_mode)
 
