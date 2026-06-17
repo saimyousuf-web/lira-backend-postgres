@@ -9,8 +9,6 @@ class CreateFeedbackRequest(BaseModel):
     convid: UUID
     sessid: UUID
 
-    cnm: str
-
     feedback_text: str | None = None
     reason: str | None = None
     event_query: str | None = None
