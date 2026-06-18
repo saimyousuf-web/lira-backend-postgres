@@ -41,17 +41,6 @@ class CourseService:
             module_ids
         )
 
-    async def get_chunk_context(
-        self,
-        chunk_ids: list[UUID],
-    ):
-        if not chunk_ids:
-            return []
-
-        return await self.course_repository.get_chunk_context(
-            chunk_ids
-        )
-
     async def validate_course(
         self,
         course_id: UUID,

@@ -23,14 +23,13 @@ class RagService:
 
     def __init__(
         self,
-        course_repo,
         feedback_repo,
         conversation_service
 
     ):
         
         self.qdrant = get_qdrant_client()
-        self.course_repository = course_repo
+
         self.conversation_service = conversation_service
         self.feedback_repo = feedback_repo
         self.s3_base_url = settings.S3_BUCKET_NAME
@@ -67,7 +66,7 @@ class RagService:
 
             await self.conversation_service.get_or_create_conversation(conversation_id, user_id, node_id, course_id, chat_title["chat_title"], user_id, "ACTIVE", step)
 
-            message = await self.conversation_service.add_message(
+            await self.conversation_service.add_message(
                 conversation_id,
                 user_id,
                 'BOT',
@@ -77,7 +76,7 @@ class RagService:
             conversation = await self.conversation_service.get_conversation(conversation_id)
             step = conversation.step
         if checkboxed_message:
-            await self.conversation_service.update_message(checkboxed_message.get("html"), checkboxed_message.get("key"), user_id)
+            await self.conversation_service.update_conversation(conversation_id, user_id, node_id, course_id, None, user_id, "ACTIVE", step,  checkboxed_message.get("html"), checkboxed_message.get("key") )
 
         chat_history = await self.get_context_history(conversation_id, user_id)
         
@@ -99,11 +98,11 @@ class RagService:
         docs_task = self.retrieve_relevant_docs(organization_id, query, course_id, top_k)
         
         feedback = await self.feedback_repo.get_top_feedbacks(organization_id, course_id)
-
+            
         docs = await docs_task
         package_name = self._extract_package_name(docs)
 
-        stringified_docs = self._build_rag_context(docs)
+        stringified_docs = self._build_rag_context(docs, coach_mode)
 
         citation_html = self._build_citation_html(docs, package_name)
 
@@ -127,7 +126,7 @@ class RagService:
             user_name=user_name,
             core_principle = core_principle,
             interaction_mode = interaction_mode,
-            feedback_string=feedback,
+            feedback_string=[val for val in feedback if val is not None],
             step_description=step_description,
             step = step_override
         )
@@ -230,32 +229,48 @@ class RagService:
 
         for match in results.points:
             metadata = match.payload or {}
-
             chunk_id = metadata.get("chunk_id")
 
             if chunk_id:
-                chunk_ids.append(UUID(chunk_id))
+                try:
+                    chunk_ids.append(UUID(chunk_id))
+                except Exception:
+                    continue
 
         if not chunk_ids:
             return []
 
-        docs = await self.course_repository.get_chunk_context(
+        docs = await self.conversation_service.get_chunk_context(
             chunk_ids
         )
+        
+        if not docs:
+            return []
 
-        return [
-            {
-                "chunk_id": doc["chunk_id"],
-                "relevant_text": doc["chunk_text"],
-                "image_keys": doc["image_keys"],
-                "module_id": doc["module_id"],
-                "module_name": doc["module_name"],
-                "module_type": doc["module_type"],
-                "course_id": doc["course_id"],
-                "course_name": doc["course_name"],
-            }
-            for doc in docs
-        ]
+        relevant_docs = []
+
+        for doc in docs:
+            text = doc.get("chunk_text")
+            if not text or not text.strip():
+                continue
+
+            relevant_docs.append({
+                "relevant_text": text,
+                "imageKeys": doc.get("image_keys") or [],
+                "fileName": doc.get("fileName"),
+                "s3Location": doc.get("s3Location"),
+                "description": doc.get("description") or "",
+                "slide_index": doc.get("slide_index"),
+                "slide_title": doc.get("slide_title") or "",
+                "document_id": doc.get("module_id"),
+                "package_name": doc.get("course_name"),
+                "chunk_id": doc.get("chunk_id"),
+                "course_id": doc.get("course_id"),
+            })
+
+        return relevant_docs
+
+
 
     def _handle_step_override(self,intent: str,step: str,voice_mode: bool) -> str:
         """
@@ -329,8 +344,7 @@ class RagService:
         if not image_keys:
             return []
 
-        course_id_clean = course_id.replace("COURSE#", "")
-        document_id_clean = (doc.get("document_id") or "").replace("DOC#", "")
+        document_id_clean = doc.get("document_id") or ""
 
         image_tags = []
 
@@ -338,13 +352,13 @@ class RagService:
             full_path = (
                 f"{self.s3_base_url}/material/"
                 f"{organization_id}/{extension}/"
-                f"{course_id_clean}/{document_id_clean}/images/{img}"
+                f"{course_id}/{document_id_clean}/images/{img}"
             )
             image_tags.append(full_path)
 
         return image_tags
 
-    def _build_rag_context(self, docs: list[dict]) -> str:
+    def _build_rag_context(self, docs: list[dict], coach_mode: bool) -> str:
         """
         Converts retrieved docs into LLM-readable context block.
         """
@@ -355,14 +369,26 @@ class RagService:
         stringified_doc_list = []
 
         for doc in docs:
+            file_name = doc.get("fileName") or "Unknown Document"
+            description = doc.get("description") or ""
+            text = doc.get("relevant_text") or ""
+            slide_index = doc.get("slide_index")
+            slide_title = doc.get("slide_title") or ""
+
+            if not text.strip():
+                continue
+
+            page_str = f"Page: {slide_index}" if slide_index is not None else ""
+            title_str = f"Title: {slide_title}" if slide_title else ""
+
             block = f"""
                 SOURCE
-                Document: {doc.get('fileName')}
-                Document_Description: {doc.get('description', '')}
-                Text: {doc.get('relevant_text', '')}
+                Document: {file_name}
+                Document_Description: {description}
+                {page_str}
+                {title_str}
+                {text}
             """
-            # Page: {doc.get('slide_index')}
-            # Title: {doc.get('slide_title')}
 
             images = self._build_image_urls(
                 doc,
@@ -370,74 +396,104 @@ class RagService:
                 doc.get("course_id", "")
             )
 
-            if images:
-                block += "\nImages:\n" + "\n".join(images)
+            if images and coach_mode:
+                block += "\n\nImage URLs:\n" + "\n".join(images)
             else:
-                block += "\n\n Image URLs: \n" + f"\n [No images found for this slide (...)]."
+                block += f"\n\nImage URLs:\n[No images found for this slide de {slide_index if slide_index is not None else ''}"
 
-            stringified_doc_list.append(block)
+            stringified_doc_list.append(block.strip())
 
         return "\n\n".join(stringified_doc_list)
     
-    def _build_citation_html(self,docs: list[dict],package_name: str | None) -> str:
-        """
-        Builds HTML citation block from retrieved documents.
-        """
-
+    def _build_citation_html(
+        self,
+        docs: list[dict],
+        package_name: str | None,
+    ) -> str:
         if not docs or not package_name:
             return ""
 
-        file_citations = {}
+        file_citations: dict[str, dict] = {}
 
         for doc in docs:
             file_name = doc.get("fileName")
-            if not file_name:
+            s3_path = doc.get("s3Location")
+
+            if not file_name or not s3_path:
                 continue
 
-            entry = file_citations.setdefault(file_name, {
-                "file_url": f"{self.s3_base_url}/{doc.get('s3Location')}",
-                "pages": set(),
-                "modules": set(),
-            })
+            file_name_lower = file_name.lower()
 
-            if doc.get("slide_index"):
-                entry["pages"].add(int(doc["slide_index"]))
+            entry = file_citations.setdefault(
+                file_name,
+                {
+                    "file_url": f"{self.s3_base_url}/{s3_path}",
+                    "pages": set(),
+                    "modules": set(),
+                },
+            )
 
-            if doc.get("slide_title"):
-                entry["modules"].add(doc["slide_title"])
+            if file_name_lower.endswith(".zip"):
+                slide_title = doc.get("slide_title")
+                if slide_title:
+                    entry["modules"].add(slide_title)
+            else:
+                slide_index = doc.get("slide_index")
+                if slide_index is not None:
+                    entry["pages"].add(int(slide_index))
 
         citation_blocks = []
 
         for file_name, entry in file_citations.items():
+            file_name_lower = file_name.lower()
+
+            is_pdf = file_name_lower.endswith(".pdf")
+            is_docx = file_name_lower.endswith(".docx")
+            is_zip = file_name_lower.endswith(".zip")
 
             final_url = entry["file_url"]
 
             pages = sorted(entry["pages"])
             modules = sorted(entry["modules"])
 
-            if pages:
+            # Add PDF page anchor
+            if is_pdf and pages:
                 final_url = f"{final_url}#page={pages[0]}"
 
-            details = ""
+            # Build details section
+            if is_docx:
+                details = ""
+            elif is_zip:
+                details = (
+                    f"Modules: {', '.join(modules)}"
+                    if modules
+                    else ""
+                )
+            else:
+                details = (
+                    f"Pages: {', '.join(map(str, pages))}"
+                    if pages
+                    else ""
+                )
 
-            if modules:
-                details = f"Modules: {', '.join(modules)}"
-            elif pages:
-                details = f"Pages: {', '.join(map(str, pages))}"
-
-            citation_blocks.append(f"""
+            citation_blocks.append(
+                f"""
                     <strong>File:</strong>
                     <a href="{final_url}" target="_blank">{file_name}</a><br/>
-                    {details}
-                """)
+                    {details if details else None}
+                """
+            )
+
+        if not citation_blocks:
+            return ""
 
         return f"""
             <div class="citations" style="margin-top:10px;font-size:small;font-style:italic;">
-            <em>Information taken from {package_name}</em><br/><br/>
-            {"<br/><br/>".join(citation_blocks)}
+                <em>Information taken from {package_name}</em><br/><br/>
+                {"<br/><br/>".join(citation_blocks)}
             </div>
         """
- 
+    
     def _get_intent_mode(self, intent):
         return get_interation_mode(intent) if intent else None
     
