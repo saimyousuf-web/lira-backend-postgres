@@ -51,7 +51,6 @@ async def stream_chat(
 
     rag_service = RagService(
         conversation_service=conversation_service,
-        course_repo=course_repo,
         feedback_repo=feedback_repo,
     )
 
@@ -83,7 +82,6 @@ async def save_response(
 
     rag_service = RagService(
         conversation_service=conversation_service,
-        course_repo=course_repo,
         feedback_repo=feedback_repo,
     )
 
