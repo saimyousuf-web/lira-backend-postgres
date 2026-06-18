@@ -2,6 +2,7 @@ from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.dialects.postgresql import ARRAY
 
 from chat_stream.repositories.Icourse import CourseRepository
 
@@ -47,37 +48,4 @@ class PostgresCourseRepository(CourseRepository):
 
         return result.scalars().all()
 
-    async def get_chunk_context(self, chunk_ids: list[UUID],) -> list[dict]:
-
-        if not chunk_ids:
-            return []
-
-        result = await self.db.execute(
-            select(
-                Chunk.id.label("chunk_id"),
-                Chunk.txt.label("chunk_text"),
-                Chunk.imgkeys.label("image_keys"),
-
-                Module.id.label("module_id"),
-                Module.nm.label("module_name"),
-                Module.ty.label("module_type"),
-
-                Course.id.label("course_id"),
-                Course.nm.label("course_name"),
-            )
-            .join(
-                Module,
-                Chunk.moid == Module.id
-            )
-            .join(
-                Course,
-                Chunk.cid == Course.id
-            )
-            .where(
-                Chunk.id.in_(chunk_ids)
-            )
-        )
-
-        rows = result.mappings().all()
-
-        return [dict(row) for row in rows]
+        

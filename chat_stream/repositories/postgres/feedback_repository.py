@@ -18,18 +18,21 @@ class PostgresFeedbackRepository(FeedbackRepository):
         course_id: UUID,
         limit: int = 3,
     ):
-
-        result = await self.db.execute(
-            select(Feedback)
-            .where(
-                Feedback.cid == course_id,
-                Feedback.isact.is_(True),
-                Feedback.feedty == "Positive",
+        try:
+            result = await self.db.execute(
+                select(Feedback.smeres)
+                .where(
+                    Feedback.ndid == organization_id,
+                    Feedback.cid == course_id,
+                )
+                .order_by(Feedback.crtat.desc())
+                .limit(limit)
             )
-            .order_by(
-                Feedback.crtat.desc()
-            )
-            .limit(limit)
-        )
 
-        return result.scalars().all()
+            # returns list of strings instead of full objects
+            res = result.scalars().all()
+            return res
+
+        except Exception as e:
+            print("Exception:", str(e))
+            raise
