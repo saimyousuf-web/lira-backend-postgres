@@ -7,7 +7,9 @@ from models.session import Session
 from chat_stream.repositories.Iconversation import ConversationRepository
 import asyncio
 from datetime import datetime
-
+from models.course import Course
+from models.module import Module
+from models.chunks import Chunk
 class PostgresConversationRepository(ConversationRepository):
 
     def __init__(self, db: AsyncSession):

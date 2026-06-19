@@ -36,6 +36,7 @@ class RagService:
         self.feedback_repo = feedback_repo
         self.s3_base_url = settings.S3_BUCKET_NAME
         self.bedrock = boto3.client("bedrock-runtime",region_name=settings.REGION)
+        self.S3_FILE_URL = settings.S3_BASE_FILE_URL
         
         self.QDRANT_URL        = settings.QDRANT_URL     
         self.QDRANT_API_KEY    = settings.QDRANT_API_KEY   
@@ -100,10 +101,17 @@ class RagService:
 
         docs_task = self.retrieve_relevant_docs(organization_id, query, course_id, top_k)
         
+        
         feedback = await self.feedback_repo.get_top_feedbacks(organization_id, course_id)
             
         docs = await docs_task
         package_name = self._extract_package_name(docs)
+        print('------------------\n')
+        print('------------------\n')
+        print('------------------\n')
+        print('--------package_name----------\n', package_name)
+        print('------------------\n')
+        print('--------retrieve_relevant_docs----------\n', docs)
 
         stringified_docs = self._build_rag_context(docs, coach_mode)
 
@@ -367,7 +375,7 @@ class RagService:
 
         for img in image_keys:
             full_path = (
-                f"{self.s3_base_url}/material/"
+                f"{self.S3_FILE_URL}/material/"
                 f"{organization_id}/{extension}/"
                 f"{course_id}/{document_id_clean}/images/{img}"
             )
@@ -427,6 +435,13 @@ class RagService:
         docs: list[dict],
         package_name: str | None,
     ) -> str:
+        print('------------------\n')
+        print('------------------\n')
+        print('------------------\n')
+        print('------------------\n')
+        print('--------cita called----------\n')
+        print('---------docs---------\n',docs)
+        print('---------package_name---------\n',package_name)
         if not docs or not package_name:
             return ""
 
@@ -444,7 +459,7 @@ class RagService:
             entry = file_citations.setdefault(
                 file_name,
                 {
-                    "file_url": f"{self.s3_base_url}/{s3_path}",
+                    "file_url": f"{self.S3_FILE_URL}/{s3_path}",
                     "pages": set(),
                     "modules": set(),
                 },
@@ -500,10 +515,19 @@ class RagService:
                     {details if details else None}
                 """
             )
-
+        
+        print('------above citation_blocks ------------\n')
+        
         if not citation_blocks:
             return ""
-
+        print('--------cita called----------\n',f"""
+            <div class="citations" style="margin-top:10px;font-size:small;font-style:italic;">
+                <em>Information taken from {package_name}</em><br/><br/>
+                {"<br/><br/>".join(citation_blocks)}
+            </div>
+        """ )
+        print('------------------\n')
+        print('------------------\n')
         return f"""
             <div class="citations" style="margin-top:10px;font-size:small;font-style:italic;">
                 <em>Information taken from {package_name}</em><br/><br/>
