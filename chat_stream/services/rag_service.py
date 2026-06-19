@@ -36,6 +36,7 @@ class RagService:
         self.feedback_repo = feedback_repo
         self.s3_base_url = settings.S3_BUCKET_NAME
         self.bedrock = boto3.client("bedrock-runtime",region_name=settings.REGION)
+        self.S3_FILE_URL = settings.S3_BASE_FILE_URL
         
         self.QDRANT_URL        = settings.QDRANT_URL     
         self.QDRANT_API_KEY    = settings.QDRANT_API_KEY   
@@ -99,6 +100,7 @@ class RagService:
         top_k = self._get_top_k(intent, coach_mode, voice_mode, step)
 
         docs_task = self.retrieve_relevant_docs(organization_id, query, course_id, top_k)
+        
         
         feedback = await self.feedback_repo.get_top_feedbacks(organization_id, course_id)
             
@@ -367,7 +369,7 @@ class RagService:
 
         for img in image_keys:
             full_path = (
-                f"{self.s3_base_url}/material/"
+                f"{self.S3_FILE_URL}/material/"
                 f"{organization_id}/{extension}/"
                 f"{course_id}/{document_id_clean}/images/{img}"
             )
@@ -444,7 +446,7 @@ class RagService:
             entry = file_citations.setdefault(
                 file_name,
                 {
-                    "file_url": f"{self.s3_base_url}/{s3_path}",
+                    "file_url": f"{self.S3_FILE_URL}/{s3_path}",
                     "pages": set(),
                     "modules": set(),
                 },
@@ -500,10 +502,11 @@ class RagService:
                     {details if details else None}
                 """
             )
-
+        
+        
         if not citation_blocks:
             return ""
-
+        
         return f"""
             <div class="citations" style="margin-top:10px;font-size:small;font-style:italic;">
                 <em>Information taken from {package_name}</em><br/><br/>
