@@ -34,7 +34,7 @@ async def get_history(
         formatted_messages = [
             {
                 "messageId": str(msg.id),
-                "sender": "user" if msg.sender == "user" else "bot",
+                "sender": "user" if msg.sender == "USER" else "bot",
                 "text": msg.msgtxt,
                 "timestamp": msg.crtat if msg.crtat else None,
                 "courseId": course_id,

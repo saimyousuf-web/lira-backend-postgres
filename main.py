@@ -97,6 +97,7 @@ def create_app() -> FastAPI:
 
     #Feedback
     app.include_router(get_all_feedback_router, prefix='/get-all-feedback')
+    app.include_router(create_feedback_router, prefix='/create-feedback')
     app.include_router(update_feedback_status_router,prefix='/update-feedback-status')
     app.include_router(delete_feedback_router,prefix='/delete-feedback-by-id')
     app.include_router(create_feedback_router,prefix='/create-feedback')

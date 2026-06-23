@@ -32,6 +32,7 @@ async def create_feedback(
             sessid=payload.sessid,
 
             sessquery=payload.event_query,
+            # sessmsg=payload.event_message,
 
             feedtxt=payload.feedback_text,
             feedty=payload.feedback_type,
