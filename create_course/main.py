@@ -6,7 +6,8 @@ import uuid
 
 from core.db import get_db_session
 from models.course import Course
-from models.nodes import Node, NodeType
+from models.cat_course import CatCourse
+from models.nodes import Node
 from models.course_node import CourseNode
 from create_course.schema import CreateCourseRequest
 
@@ -23,21 +24,22 @@ async def create_course(
     user_id = uuid.UUID("6418e458-50a1-70fe-9d3e-b52f5d2df57c")
 
     try:
-        node_id = uuid.UUID(ctx_ndid)
+        node_ids = [uuid.UUID(node_id) for node_id in payload.node_ids]
 
         stmt = (
             select(Node)
-            .join(Node.ndty)
             .where(
-                Node.id == node_id,
-                NodeType.ty == ctx_ndty,
+                Node.id.in_(node_ids)
             )
         )
         result = await db.execute(stmt)
-        node = result.scalar_one_or_none()
+        nodes = result.scalars().all()
 
-        if not node:
-            raise HTTPException(status_code=404, detail="Node not found")
+        if len(nodes) != len(node_ids):
+            raise HTTPException(
+            status_code=404,
+            detail="One or more node IDs do not exist"
+            )
 
         course = Course(
             nm=payload.name.strip(),
@@ -49,14 +51,24 @@ async def create_course(
         db.add(course)
         await db.flush()  # generates course.id
 
-        course_node = CourseNode(
+        for node in nodes:
+            course_node = CourseNode(
+                cid=course.id,
+                ndid=node.id,
+                crtby=user_id,
+                updby=user_id,
+            )
+            db.add(course_node)
+
+        cat_course = CatCourse(
+            catid=payload.category_id,
             cid=course.id,
-            ndid=node.id,
             crtby=user_id,
             updby=user_id,
         )
 
-        db.add(course_node)
+        db.add(cat_course)
+
         await db.commit()
         await db.refresh(course)
 

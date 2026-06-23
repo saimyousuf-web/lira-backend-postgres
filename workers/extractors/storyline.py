@@ -351,7 +351,9 @@ def _embed_and_upsert_qdrant(
             points=[
                 PointStruct(
                     id=str(chunk_id),
-                    vector=normalized,
+                    vector={
+                        "vector": normalized
+                    },
                     payload={
                         "chunk_id":        str(chunk_id),
                         "organization_id": org_id,

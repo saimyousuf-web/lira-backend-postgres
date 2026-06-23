@@ -353,8 +353,8 @@ async def chunk_and_embed_pdf(
     user_id = uuid.UUID("6418e458-50a1-70fe-9d3e-b52f5d2df57c")
 
     try:
-        course_id = uuid.UUID(ctx_cid)
-        module_id = uuid.UUID(ctx_moid)
+        course_id = ctx_cid
+        module_id = ctx_moid
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid UUID format in path")
 
@@ -382,13 +382,13 @@ async def chunk_and_embed_pdf(
     except SQLAlchemyError as e:
         raise HTTPException(status_code=500, detail=f"Database error: {e}")
 
-    # ------------------------------------------------------------------
-    # 2. Fetch PDF bytes
-    # ------------------------------------------------------------------
-    try:
-        pdf_bytes = _fetch_pdf_bytes(file_bytes)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to fetch PDF: {e}")
+    # # ------------------------------------------------------------------
+    # # 2. Fetch PDF bytes
+    # # ------------------------------------------------------------------
+    # try:
+    #     pdf_bytes = _fetch_pdf_bytes(file_bytes)
+    # except Exception as e:
+    #     raise HTTPException(status_code=500, detail=f"Failed to fetch PDF: {e}")
 
     # ------------------------------------------------------------------
     # 3. Extract images → S3 → Textract OCR
@@ -397,7 +397,7 @@ async def chunk_and_embed_pdf(
         f"material/{ctx_orgid}/pdf/{ctx_cid}/{ctx_moid}/images/"
     )
 
-    doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+    doc = fitz.open(stream=file_bytes, filetype="pdf")
 
     try:
         _upload_page_images(doc, s3_prefix)
@@ -411,8 +411,10 @@ async def chunk_and_embed_pdf(
     # 4. Build chunks
     # ------------------------------------------------------------------
     flat_chunks = _build_all_page_chunks(doc, page_images)
+    print("This is flat chunks:", flat_chunks)
     doc.close()
 
+    print(f"Total chunks created from PDF: {len(flat_chunks)}")
     if not flat_chunks:
         raise HTTPException(status_code=422, detail="No content could be extracted from PDF")
 
@@ -427,6 +429,9 @@ async def chunk_and_embed_pdf(
         text: str = chunk_data["text"]
         img_keys: list[str] = chunk_data["image"]          # S3 filenames
         page_num: int = chunk_data["page_num"]
+
+        print(f"Processing chunk: {chunk_id}")
+        print(f"Chunk text: {text}")
 
         status, _ = _embed_and_upsert(
             chunk_id=chunk_id,
@@ -460,7 +465,7 @@ async def chunk_and_embed_pdf(
     now = datetime.now(timezone.utc)
 
     module.isvec = True
-    module.sts = "processed"
+    module.sts = "APPROVED"
     module.updat = now
     module.updby = user_id
 
@@ -476,7 +481,7 @@ async def chunk_and_embed_pdf(
         await db.rollback()
         # Best-effort: mark module as failed
         try:
-            module.sts = "failed"
+            module.sts = "FAILED"
             module.updat = now
             await db.commit()
         except Exception:

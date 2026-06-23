@@ -10,13 +10,13 @@ from dependencies.auth import require_permission
 from models.course import Course
 from models.category import Category
 from models.cat_course import CatCourse
-from create_catcourse.schema import CreateCatCourseRequest
+# from create_catcourse.schema import CreateCatCourseRequest
 router = APIRouter()
 
 
 @router.post("/{ctx_orgid}/{ctx_ndid}/{ctx_ndty}", response_model=dict)
 async def create_catcourse(
-    payload: CreateCatCourseRequest = Body(...),
+    payload: dict = Body(...),
     # user=Depends(require_permission("create:catcourse")),
     db: AsyncSession = Depends(get_db_session),
 ):

@@ -17,7 +17,7 @@ router = APIRouter()
 @router.get("/{orgid}/{ndid}/{ndty}")
 async def get_all_users(
     orgid: UUID = Path(...),
-    user=Depends(get_current_user),
+    # user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session),
 ):
     try:
@@ -88,6 +88,7 @@ async def get_all_users(
         # Get users assigned to any node in this org
         stmt = (
             select(
+                User.id,
                 User.first_name,
                 User.last_name,
                 User.email,
@@ -105,7 +106,8 @@ async def get_all_users(
             .where(
                 LiraAccess.ndid.in_(node_ids),
                 LiraAccess.isact.is_(True),
-                User.is_active.is_(False),
+                LiraAccess.isapr.is_(False),
+                User.is_active.is_(True),
             )
             .order_by(
                 User.first_name,
@@ -121,6 +123,7 @@ async def get_all_users(
         for row in rows:
             users.append(
                 {
+                    "id": row.id,
                     "name": f"{row.first_name} {row.last_name}",
                     "email": row.email,
                     "role": row.role,
@@ -141,7 +144,3 @@ async def get_all_users(
             status_code=500,
             detail=f"Failed to fetch users: {str(e)}",
         )
-    
-
-
-    # 834236b7-a4dd-45fa-894c-82fc09c1f6ef

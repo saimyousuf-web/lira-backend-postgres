@@ -90,6 +90,8 @@ class RagService:
         top_k = self._get_top_k(intent, coach_mode, voice_mode, step)
 
         docs_task = self.retrieve_relevant_docs(organization_id, query, course_id, top_k)
+
+        print(docs_task)
         
         feedback_task = self.feedback_repo.get_top_feedbacks(organization_id, course_id)
 
@@ -158,17 +160,16 @@ class RagService:
         if not full_response:
             raise HTTPException(status_code=400, detail="Missing full_response")
 
-        message = await self.conversation_service.add_message(
+        await self.conversation_service.add_message(
             conversation_id,
             user_id,
             'BOT',
             full_response,
         )
 
-        await asyncio.gather(
-            self.conversation_service.update_step(conversation_id, step),
-            self.conversation_service.save_message_cache(conversation_id, user_id, 'BOT', full_response,)
-        )
+        
+        await self.conversation_service.update_step(conversation_id, step)
+        await self.conversation_service.save_message_cache(conversation_id, user_id, 'BOT', full_response)
 
 
         return {"message": "saved success"}
@@ -232,6 +233,8 @@ class RagService:
                 include_metadata=True,
                 filter={"course_id": str(course_id)}
             )
+
+            print(results)
 
         except Exception as e:
             raise HTTPException(
@@ -389,7 +392,7 @@ class RagService:
             if images:
                 block += "\nImages:\n" + "\n".join(images)
             else:
-                block += "\n\n Image URLs: \n" + f"\n [No images found for this slide {slide_index}]."
+                block += "\n\n Image URLs: \n" + f"\n [No images found for this slide {doc.get('slide_index')}]."
 
             stringified_doc_list.append(block)
 

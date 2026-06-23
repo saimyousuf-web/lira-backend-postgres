@@ -40,6 +40,7 @@ from health import router as health_router
 from ingest.main import router as ingest_router
 from chat_stream.main import router as chat_stream_router
 from dashboard_chat.main import router as dashboard_chat_router
+from create_feedback.main import router as create_feedback_router
 
 async def init_db():
     async with engine.begin() as conn:
@@ -98,6 +99,7 @@ def create_app() -> FastAPI:
     app.include_router(get_all_feedback_router, prefix='/get-all-feedback')
     app.include_router(update_feedback_status_router,prefix='/update-feedback-status')
     app.include_router(delete_feedback_router,prefix='/delete-feedback-by-id')
+    app.include_router(create_feedback_router,prefix='/create-feedback')
 
     # Health Check
     app.include_router(health_router, prefix="/health", tags=["Health Check"])

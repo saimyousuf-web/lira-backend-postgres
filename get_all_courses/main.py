@@ -19,8 +19,6 @@ async def get_all_courses(
     db: AsyncSession = Depends(get_db_session),
 ):
     try:
-        node_id = uuid.UUID(ctx_ndid)
-
         stmt = (
             select(
                 Course.id.label("id"),
@@ -28,13 +26,12 @@ async def get_all_courses(
                 Course.dsc.label("dsc"),
                 Course.crtat.label("crtat"),
             )
-            .join(CourseNode, CourseNode.cid == Course.id)
-            .where(CourseNode.ndid == node_id)
             .order_by(Course.crtat.desc())
         )
 
         result = await db.execute(stmt)
         courses = result.mappings().all()
+
 
         items = [
             {

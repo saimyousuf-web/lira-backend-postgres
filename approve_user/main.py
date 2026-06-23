@@ -1,10 +1,8 @@
 from uuid import UUID
-
+from dependencies.auth import require_permission
 from fastapi import APIRouter, Depends, Path, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from auth.main import get_current_user
 from core.db import get_db_session
 from models.user import User
 from models.lira_access import LiraAccess
@@ -12,12 +10,13 @@ from models.lira_access import LiraAccess
 router = APIRouter()
 
 
-@router.post("/{ndid}/{ndty}/{userId}")
+@router.post("/{orgid}/{ndid}/{ndty}/{userId}")
 async def approve_user(
+    orgid: UUID = Path(...),
     ndid: UUID = Path(...),
     ndty: str = Path(...),
     userId: UUID = Path(...),
-    current_user=Depends(get_current_user),
+    # auth=Depends(require_permission("approve_user")),
     db: AsyncSession = Depends(get_db_session),
 ):
     try:
@@ -50,11 +49,10 @@ async def approve_user(
                 detail="User access not found",
             )
 
-        # Approve user
         user.is_active = True
 
-        # Activate access
-        access.isact = True
+        # Approve user
+        access.isapr = True
 
         await db.commit()
 

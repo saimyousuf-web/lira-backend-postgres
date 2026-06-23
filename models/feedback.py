@@ -61,11 +61,7 @@ class Feedback(Base):
         nullable=False,
     )
 
-    # cnm = Column(String(255), nullable=False)
-
     sessquery = Column(Text, nullable=False)
-
-    # sessmsg = Column(Text, nullable=False)
 
     feedtxt = Column(Text)
 

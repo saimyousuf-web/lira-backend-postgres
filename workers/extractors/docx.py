@@ -125,7 +125,9 @@ def _embed_and_upsert_qdrant(
         points=[
         PointStruct(
             id=str(chunk_id),     
-            vector=normalized,
+            vector={
+                "vector": normalized
+            },
             payload={
                 "chunk_id":       str(chunk_id),
                 "organization_id": organization_id,
@@ -194,6 +196,8 @@ async def chunk_and_embed_docx(
     docx_json = extract_docx_pages(docx_bytes)
     raw_chunks = _build_chunks(docx_json)
 
+    print("raw chunks", raw_chunks)
+
     if not raw_chunks:
         raise HTTPException(status_code=422, detail="No text could be extracted from document")
 
@@ -205,7 +209,7 @@ async def chunk_and_embed_docx(
     for chunk_data in raw_chunks:
         chunk_id: uuid.UUID = chunk_data["chunk_id"]
         text: str = chunk_data["text"]
-
+        print(f"Processing chunk {chunk_id} with text", text)
         embedding_status, _ = _embed_and_upsert_qdrant(
             chunk_id=chunk_id,
             text=text,

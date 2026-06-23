@@ -23,7 +23,7 @@ async def process_document_internal(payload: dict):
     print(f"Processing file from S3: {s3_key}")
 
     if s3_key.endswith(".zip"):
-        return handle_zip_file(org_id, course_id, course_name, document_id, file_bytes,S3_BUCKET)
+        return await handle_zip_file(org_id, course_id, course_name, document_id, file_bytes,S3_BUCKET, db)
 
     if s3_key.endswith(".pdf"):
        content_objects_json = await chunk_and_embed_pdf(file_bytes, document_id, course_id,org_id,course_name, db)

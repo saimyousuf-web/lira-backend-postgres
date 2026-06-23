@@ -1,6 +1,8 @@
+from ctypes import Array
 import uuid
 
 from sqlalchemy import (
+    ARRAY,
     Column,
     Text,
     DateTime,
@@ -67,5 +69,10 @@ class Chunk(Base):
     updby = Column(
         UUID(as_uuid=True),
         ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    
+    imgkeys = Column(
+        ARRAY(Text),
         nullable=True,
     )

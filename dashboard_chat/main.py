@@ -1,6 +1,5 @@
 from fastapi import APIRouter, HTTPException, Depends, Response
 from dependencies.auth import get_current_user
-from mangum import Mangum
 from pydantic import BaseModel
 from typing import Optional
 import uuid
