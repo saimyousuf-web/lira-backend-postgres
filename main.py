@@ -46,9 +46,11 @@ async def init_db():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
-
 def create_app() -> FastAPI:
-    app = FastAPI()
+    app = FastAPI(    
+    docs_url=None,
+    redoc_url=None,
+    openapi_url=None)
     cors_middleware(app)
 
     @app.on_event("startup")

@@ -7,7 +7,7 @@ STEP_REGISTRY = {
             "Ask it exactly as it appears — do not rephrase, simplify, or add context. "
             "Ask only 3 questions if not then 2"
             "Make sure that the questions are moderate and not too easy."
-            "Do not evaluate, react to, or comment on any prior response. "
+            "Do not evaluate, react to, or comment on any prior response."
             "Do not teach. Do not hint at the answer. Just ask."
             "**Each option should be with checkbox**"
         ),
