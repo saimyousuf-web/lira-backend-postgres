@@ -347,8 +347,8 @@ async def chunk_and_embed_pdf(
     user_id = uuid.UUID("6418e458-50a1-70fe-9d3e-b52f5d2df57c")
 
     try:
-        course_id = uuid.UUID(ctx_cid)
-        module_id = uuid.UUID(ctx_moid)
+        course_id = uuid.UUID(str(ctx_cid))
+        module_id = uuid.UUID(str(ctx_moid))
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid UUID format in path")
 
@@ -391,7 +391,11 @@ async def chunk_and_embed_pdf(
         f"material/{ctx_orgid}/pdf/{ctx_cid}/{ctx_moid}/images/"
     )
 
-    doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+  # Handle both raw bytes and already-opened Document
+    if isinstance(pdf_bytes, fitz.Document):
+        doc = pdf_bytes
+    else:
+        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
 
     try:
         _upload_page_images(doc, s3_prefix)
@@ -435,7 +439,7 @@ async def chunk_and_embed_pdf(
         if status == "failed":
             failed_count += 1
             # Skip persisting a chunk whose vector is missing
-            continue
+            print("failed")
 
         chunk_row = Chunk(
             id=chunk_id,
@@ -445,6 +449,7 @@ async def chunk_and_embed_pdf(
             imgkeys=img_keys,
             crtby=user_id,
             updby=user_id,
+            slideindex=page_num,
         )
         db.add(chunk_row)
 
@@ -454,7 +459,7 @@ async def chunk_and_embed_pdf(
     now = datetime.now(timezone.utc)
 
     module.isvec = True
-    module.sts = "processed"
+    module.sts = "APPROVED"
     module.updat = now
     module.updby = user_id
 
@@ -470,7 +475,7 @@ async def chunk_and_embed_pdf(
         await db.rollback()
         # Best-effort: mark module as failed
         try:
-            module.sts = "failed"
+            module.sts = "FAILED"
             module.updat = now
             await db.commit()
         except Exception:

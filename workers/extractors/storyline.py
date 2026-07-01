@@ -299,7 +299,7 @@ async def process_storyline_internal(
         except SQLAlchemyError as e:
             await db.rollback()
             try:
-                module.sts   = "failed"
+                module.sts   = "FAILED"
                 module.updat = now
                 await db.commit()
             except Exception:

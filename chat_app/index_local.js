@@ -36,7 +36,7 @@ function postOllamaStream(payload) {
   });
 }
 
-async function* streamOllamaTokens(prompt, userMessage) {
+async function* streamOllamaTokens(prompt, userMessage, citation_html) {
   const res = await postOllamaStream({
     model: OLLAMA_MODEL,
     stream: true,
@@ -72,6 +72,7 @@ async function* streamOllamaTokens(prompt, userMessage) {
       const token = parsed.message?.content || "";
       if (token) yield token;
     }
+
   }
 }
 
@@ -160,10 +161,11 @@ app.post("/stream", async (req, res) => {
     const user_message = data?.streaming_metadata?.user_message;
     let voice_mode = data?.streaming_metadata?.voice_mode;
     const storage_metadata = data?.storage_metadata;
-
-    console.log(data);
-    console.log('--------------------- prompt ------', prompt);
-    console.log("RAG response received. Voice mode:", voice_mode);
+    const citation_html = data?.streaming_metadata?.citation_html;
+    console.log('\n--------------citation--------------\n', citation_html);
+    // console.log(data);
+    // console.log('--------------------- prompt ------', prompt);
+    // console.log("RAG response received. Voice mode:", voice_mode);
 
     if (!prompt) throw new Error("Invalid RAG response: missing prompt");
 
@@ -252,6 +254,8 @@ app.post("/stream", async (req, res) => {
       }
 
       if (buffer) res.write(buffer);
+      res.write(citation_html || "");  
+      fullResponse = fullResponse + "\n" + (citation_html || "");
     }
     
     console.log('-------------full_response-------- ', fullResponse)
@@ -265,7 +269,11 @@ app.post("/stream", async (req, res) => {
         "Content-Type": "application/json",
         Authorization: req.headers?.authorization || "",
       },
-      body: JSON.stringify({ ...storage_metadata, full_response: fullResponse }),
+      body: JSON.stringify({
+        ...storage_metadata,
+        full_response: fullResponse,
+        
+      }),
     }).catch(console.error);
 
   } catch (err) {

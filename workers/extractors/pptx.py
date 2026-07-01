@@ -385,7 +385,7 @@ async def chunk_and_embed_pptx(
     except SQLAlchemyError as e:
         await db.rollback()
         try:
-            module.sts   = "failed"
+            module.sts   = "FAILED"
             module.updat = now
             await db.commit()
         except Exception:

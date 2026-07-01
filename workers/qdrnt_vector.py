@@ -5,7 +5,7 @@ from qdrant_client.models import Distance, VectorParams, PointStruct
 import numpy as np
 from core.config import settings
 QDRANT_URL        = settings.QDRANT_URL     
-QDRANT_API_KEY    = settings.QDRANT_API_KEY   
+# QDRANT_API_KEY    = settings.QDRANT_API_KEY   
 QDRANT_COLLECTION = settings.QDRANT_COLLECTION
 VECTOR_DIM        = 1024  
 
@@ -15,7 +15,7 @@ _qdrant_client: QdrantClient | None = None
 def get_qdrant_client() -> QdrantClient:
     global _qdrant_client
     if _qdrant_client is None:
-        _qdrant_client = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY)
+        _qdrant_client = QdrantClient(url=QDRANT_URL)  #api_key=QDRANT_API_KEY
     return _qdrant_client
 
 

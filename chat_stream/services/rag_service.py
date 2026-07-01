@@ -33,8 +33,10 @@ class RagService:
         self.conversation_service = conversation_service
         self.feedback_repo = feedback_repo
         self.s3_base_url = settings.S3_BUCKET_NAME
-
-        self.QDRANT_URL        = settings.QDRANT_URL
+        # self.bedrock = boto3.client("bedrock-runtime",region_name=settings.REGION)
+        self.S3_FILE_URL = settings.S3_BASE_FILE_URL
+        
+        self.QDRANT_URL        = settings.QDRANT_URL     
         self.QDRANT_API_KEY    = settings.QDRANT_API_KEY   
         self.QDRANT_COLLECTION = settings.QDRANT_COLLECTION
         self.VECTOR_DIM        = 1024  
@@ -58,6 +60,9 @@ class RagService:
         step = None
         step_description=None
         next_step=None
+        print('\n---------------course_name--------------\n')
+        print(course_name, '\n---------------course_name--------------\n')
+        print('\n---------------course_name--------------\n')
         if not conversation_id:
             conversation_id = uuid4()
             step = self._get_step_mode(coach_mode, voice_mode, user_message)
@@ -96,11 +101,16 @@ class RagService:
         top_k = self._get_top_k(intent, coach_mode, voice_mode, step)
 
         docs_task = self.retrieve_relevant_docs(organization_id, query, course_id, top_k)
+        print('\n---------------docs_task--------------\n')
+        print(docs_task, '\n---------------docs_task--------------\n')
+        print('\n---------------docs_task--------------\n')
         
         feedback = await self.feedback_repo.get_top_feedbacks(organization_id, course_id)
             
         docs = await docs_task
         package_name = self._extract_package_name(docs)
+        print('\n---------------package_name--------------\n')
+        print(package_name, '\n---------------package_name--------------\n')
 
         stringified_docs = self._build_rag_context(docs, coach_mode)
 
@@ -135,7 +145,8 @@ class RagService:
             "streaming_metadata": {
                 "prompt": prompt,
                 "user_message": user_message,
-                "voice_mode": voice_mode
+                "voice_mode": voice_mode,
+                "citation_html": citation_html,
             },
             "storage_metadata": {
                 "organization_id": organization_id,
@@ -179,9 +190,15 @@ class RagService:
     async def get_context_history(self, conversation_id, user_id, limit: int = 20,) -> str:
         messages = await self.conversation_service.get_context(conversation_id, user_id)
         return messages or []
+    print('\n---------------get_context_history--------------\n')
+    print('\n---------------get_context_history--------------\n')
+    print('\n---------------get_context_history--------------\n')
 
     async def _generate_embedding(self,text: str,) -> list[float]:
         return await asyncio.to_thread(embed_text, text)
+    print('\n---------------_generate_embedding--------------\n')
+    print('\n---------------_generate_embedding--------------\n')
+
     
     async def _normalize_vector(self, vec):
         """L2-normalize a vector so its magnitude becomes 1"""
@@ -202,12 +219,13 @@ class RagService:
             if not embedding:
                 return []
 
+            print(f"Querying Qdrant for orgid: {orgid}, course_id: {course_id}, query: {query}")
             # collection_info = self.qdrant.get_collection(QDRANT_COLLECTION)
 
             results = self.qdrant.query_points(
                 collection_name=QDRANT_COLLECTION,
                 limit=k,
-                query= await self._normalize_vector(embedding),
+                query=await self._normalize_vector(embedding),
                 query_filter=Filter(
                     must=[
                         FieldCondition(
@@ -216,8 +234,14 @@ class RagService:
                         )
                     ]
                 ),
+                
                 with_payload=True,
+                # Remove: projection={"vector": NamedVector(name="embedding")}
+                # Your collection uses Default vector (unnamed), and you don't need
+                # vectors returned since you only use match.payload below
             )
+            print("\n---------------Qdrant query results--------------\n")
+            print(f"Qdrant query results: {results.points if results else 'No results'}")
 
         except Exception as e:
             raise HTTPException(
@@ -260,8 +284,8 @@ class RagService:
                 "fileName": doc.get("fileName"),
                 "s3Location": doc.get("s3Location"),
                 "description": doc.get("description") or "",
-                "slide_index": doc.get("slide_index"),
-                "slide_title": doc.get("slide_title") or "",
+                "slide_index": doc.get("slideindex"),
+                "slide_title": doc.get("slidetitle") or "",
                 "document_id": doc.get("module_id"),
                 "package_name": doc.get("course_name"),
                 "chunk_id": doc.get("chunk_id"),
@@ -350,7 +374,7 @@ class RagService:
 
         for img in image_keys:
             full_path = (
-                f"{self.s3_base_url}/material/"
+                f"{self.S3_FILE_URL}/material/"
                 f"{organization_id}/{extension}/"
                 f"{course_id}/{document_id_clean}/images/{img}"
             )
@@ -414,11 +438,12 @@ class RagService:
             return ""
 
         file_citations: dict[str, dict] = {}
-
+        print('\n---------------docs--------------\n')
+        print(docs, '\n---------------docs--------------\n')
         for doc in docs:
             file_name = doc.get("fileName")
             s3_path = doc.get("s3Location")
-
+            print(f"-----Processing doc--------: file_name={file_name}, s3_path={s3_path}")
             if not file_name or not s3_path:
                 continue
 
@@ -427,7 +452,7 @@ class RagService:
             entry = file_citations.setdefault(
                 file_name,
                 {
-                    "file_url": f"{self.s3_base_url}/{s3_path}",
+                    "file_url": f"{self.S3_FILE_URL}/{s3_path}",
                     "pages": set(),
                     "modules": set(),
                 },
@@ -480,19 +505,22 @@ class RagService:
                 f"""
                     <strong>File:</strong>
                     <a href="{final_url}" target="_blank">{file_name}</a><br/>
-                    {details if details else None}
+                    {details if details else ""}
                 """
             )
-
+        
+        
         if not citation_blocks:
             return ""
-
-        return f"""
+        
+        cite = f"""
             <div class="citations" style="margin-top:10px;font-size:small;font-style:italic;">
                 <em>Information taken from {package_name}</em><br/><br/>
-                {"<br/><br/>".join(citation_blocks)}
+                {"<br/><br/>".join(citation_block for citation_block in citation_blocks)}
             </div>
         """
+        print("\n--------------cite----------------\n",cite)
+        return cite
     
     def _get_intent_mode(self, intent):
         return get_interation_mode(intent) if intent else None

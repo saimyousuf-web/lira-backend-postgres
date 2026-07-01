@@ -14,25 +14,33 @@ async def process_document_internal(payload: dict):
     course_id = payload["course_id"]
     course_name = payload["course_name"]
     document_id = payload["module_id"]
-    s3_key = payload["s3_key"]
+    s3_key = payload.get("s3_key")
     db = payload["db"]
-    # Read file from S3
-    obj = s3_client.get_object(Bucket=S3_BUCKET, Key=s3_key)
-    file_bytes = obj["Body"].read()
 
-    print(f"Processing file from S3: {s3_key}")
+    # Prefer file bytes if provided (direct upload), otherwise read file from S3
+    if payload.get("file_bytes") is not None:
+        file_bytes = payload.get("file_bytes")
+        print(f"Processing file from raw upload: {document_id}")
+    else:
+        # Read file from S3
+        obj = s3_client.get_object(Bucket=S3_BUCKET, Key=s3_key)
+        file_bytes = obj["Body"].read()
+        print(f"Processing file from S3: {s3_key}")
 
-    if s3_key.endswith(".zip"):
+    # determine file type from s3_key or provided file_name
+    _key_for_ext = s3_key or payload.get("file_name") or ""
+
+    if _key_for_ext.endswith(".zip"):
         return handle_zip_file(org_id, course_id, course_name, document_id, file_bytes,S3_BUCKET)
 
-    if s3_key.endswith(".pdf"):
+    if _key_for_ext.endswith(".pdf"):
        content_objects_json = await chunk_and_embed_pdf(file_bytes, document_id, course_id,org_id,course_name, db)
        print(content_objects_json, 'content_objects_jsoncontent_objects_json')
     
     # elif s3_key.endswith(".pptx"):
     #     pptimages(file_bytes=file_bytes,document_id=document_id,course_id=course_id,org_id=org_id,course_name=course_name,S3_BUCKET=S3_BUCKET)
 
-    elif  s3_key.endswith(".docx"):
+    elif  _key_for_ext.endswith(".docx"):
         return await chunk_and_embed_docx(file_bytes, org_id, course_id, course_name, document_id, db)
 
     # elif  s3_key.endswith(".txt"):
