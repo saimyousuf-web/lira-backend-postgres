@@ -74,7 +74,7 @@ async def create_user(
             target_node_id = payload.organization_id
 
         # SME & MANAGER Validation
-        if role_name in ["SME", "MANAGER"]:
+        elif role_name in ["SME", "MANAGER"]:
 
             if not payload.department_id:
                 raise HTTPException(

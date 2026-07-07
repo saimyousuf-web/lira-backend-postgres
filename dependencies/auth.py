@@ -2,7 +2,7 @@ import boto3
 from fastapi import HTTPException, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import requests
-# from jose import jwt
+from jose import jwt
 from fastapi import HTTPException
 from functools import lru_cache
 from core.config import settings
