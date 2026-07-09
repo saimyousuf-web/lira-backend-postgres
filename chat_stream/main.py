@@ -13,7 +13,8 @@ from chat_stream.repositories.postgres.course_repository import PostgresCourseRe
 from chat_stream.repositories.postgres.conversation_repository import PostgresConversationRepository
 from chat_stream.repositories.postgres.feedback_repository import PostgresFeedbackRepository
 from chat_stream.services.conversation_service import ConversationService
- 
+from core.id_cypher import decrypt_id
+from cryptography.fernet import InvalidToken
 router = APIRouter()
 
 class ChatRequest(BaseModel):
@@ -31,63 +32,91 @@ class ChatRequest(BaseModel):
 
 @router.post("")
 async def stream_chat(
-    data: dict,
+    data: ChatRequest,
     user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session),
-    # controller: ChatController = Depends(get_chat_controller)
 ):
     if not user:
         raise HTTPException(status_code=401, detail="Unauthorized")
-    # return await controller.stream_chat(data=data, user=user)
-    
-    conversation_repo = PostgresConversationRepository(db)
-    course_repo = PostgresCourseRepository(db)
-    feedback_repo = PostgresFeedbackRepository(db)
-    
-    conversation_service = ConversationService(
-        conversation_repo,
-        db
-    )
 
-    rag_service = RagService(
-        conversation_service=conversation_service,
-        feedback_repo=feedback_repo,
-    )
+    try:
+        payload = data.model_dump()
 
-    result = await rag_service.execute(
-        data = data,
-        user=user
-    )
+        payload["orgid"] = decrypt_id(payload["orgid"])
+        payload["ndid"] = decrypt_id(payload["ndid"])
+        payload["course_id"] = decrypt_id(payload["course_id"])
 
-    return result
+        if payload.get("chat_id"):
+            payload["chat_id"] = decrypt_id(payload["chat_id"])
 
+        conversation_repo = PostgresConversationRepository(db)
+        feedback_repo = PostgresFeedbackRepository(db)
+
+        conversation_service = ConversationService(
+            conversation_repo,
+            db,
+        )
+
+        rag_service = RagService(
+            conversation_service=conversation_service,
+            feedback_repo=feedback_repo,
+        )
+
+        return await rag_service.execute(
+            data=payload,
+            user=user,
+        )
+
+    except InvalidToken:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid encrypted ID",
+        )
 
 @router.post("/save")
 async def save_response(
     data: Dict,
     user=Depends(get_current_user),
-    db: AsyncSession = Depends(get_db_session)
+    db: AsyncSession = Depends(get_db_session),
 ):
     if not user:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
-    conversation_repo = PostgresConversationRepository(db)
-    course_repo = PostgresCourseRepository(db)
-    feedback_repo = PostgresFeedbackRepository(db)
-    
-    conversation_service = ConversationService(
-        conversation_repo,
-        db
-    )
+    try:
+        payload = dict(data)
 
-    rag_service = RagService(
-        conversation_service=conversation_service,
-        feedback_repo=feedback_repo,
-    )
+        if payload.get("orgid"):
+            payload["orgid"] = decrypt_id(payload["orgid"])
 
-    result = await rag_service.save(
-        data = data,
-        user=user
-    )
-    return result
+        if payload.get("ndid"):
+            payload["ndid"] = decrypt_id(payload["ndid"])
 
+        if payload.get("course_id"):
+            payload["course_id"] = decrypt_id(payload["course_id"])
+
+        if payload.get("chat_id"):
+            payload["chat_id"] = decrypt_id(payload["chat_id"])
+
+        conversation_repo = PostgresConversationRepository(db)
+        feedback_repo = PostgresFeedbackRepository(db)
+
+        conversation_service = ConversationService(
+            conversation_repo,
+            db,
+        )
+
+        rag_service = RagService(
+            conversation_service=conversation_service,
+            feedback_repo=feedback_repo,
+        )
+
+        return await rag_service.save(
+            data=payload,
+            user=user,
+        )
+
+    except InvalidToken:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid encrypted ID",
+        )

@@ -1,97 +1,89 @@
+from cryptography.fernet import InvalidToken
+
 from fastapi import APIRouter, HTTPException, Depends
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from sqlalchemy.exc import SQLAlchemyError
-import uuid
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.db import get_db_session
-from models.course import Course
-from models.cat_course import CatCourse
-from models.course_node import CourseNode
+from core.id_cypher import decrypt_id
+from dependencies.auth import get_current_user
+from models.lira_access import LiraAccess
 from models.nodes import Node, NodeType
-from dependencies.auth import require_permission
+from models.roles import Role
+from models.user import User
+
+from get_user_current_info.schema import UserCurrentInfoResponse
 
 router = APIRouter()
 
 
-@router.get("/{ctx_orgid}/{ctx_ndid}/{ctx_ndty}/{catid}")
-async def get_course_by_catid(
-    ctx_orgid: str,
-    ctx_ndid: str,
-    ctx_ndty: str,
-    catid: str,
-    # user=Depends(require_permission("read:course")),
+@router.get(
+    "/{orgid}/{ndid}/{ndty}",
+    response_model=UserCurrentInfoResponse,
+)
+async def get_user_current_info(
+    orgid: str,
+    ndid: str,
+    ndty: str,
+    user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session),
 ):
     try:
-        node_id = uuid.UUID(ctx_ndid)
-        category_id = uuid.UUID(catid)
+        node_id = decrypt_id(ndid)
 
-        # Validate node
-        stmt = (
-            select(Node)
-            .join(Node.ndty)
-            .where(
-                Node.id == node_id,
-                NodeType.ty == ctx_ndty,
-            )
+        user_id = user.get("sub")
+
+        # User details
+        user_data = await db.scalar(
+            select(User).where(User.id == user_id)
         )
 
-        result = await db.execute(stmt)
-        node = result.scalar_one_or_none()
-
-        if not node:
+        if not user_data:
             raise HTTPException(
                 status_code=404,
-                detail="Node not found"
+                detail="User not found",
             )
 
-        # Get courses for category + node
-        stmt = (
-        select(
-        Course.id,
-        Course.nm,
-        Course.dsc,
-        Course.crtat,
-        Course.updat
-        )
-            .join(CatCourse, CatCourse.cid == Course.id)
-            # .join(CourseNode, CourseNode.cid == Course.id)
+        # Role
+        role_name = await db.scalar(
+            select(Role.name)
+            .join(LiraAccess, LiraAccess.rlid == Role.id)
             .where(
-                CatCourse.catid == category_id
-                # CourseNode.ndid == node.id,
+                LiraAccess.uid == user_id,
+                LiraAccess.ndid == node_id,
             )
         )
 
-        result = await db.execute(stmt)
-        courses = result.all()
+        if not role_name:
+            raise HTTPException(
+                status_code=404,
+                detail="Role not found",
+            )
 
-        data = [
-            {
-                "cid": course.id,
-                "cnm": course.nm,
-                "desc": course.dsc,
-                "crtat": course.crtat,
-                "updat": course.updat,
-            }
-            for course in courses
-        ]
+        # Node Type
+        node_name = await db.scalar(
+            select(NodeType.ty)
+            .join(Node, Node.ndtyid == NodeType.id)
+            .where(Node.id == node_id)
+        )
 
-        return {
-            "status": "success",
-            "status_code": 200,
-            "data": data,
-            "message": "Course retrieved successfully",
-        }
+        if not node_name:
+            raise HTTPException(
+                status_code=404,
+                detail="Node type not found",
+            )
 
-    except ValueError:
+        return UserCurrentInfoResponse(
+            userId=user_data.id,
+            name=f"{user_data.first_name} {user_data.last_name}",
+            role=role_name,
+            is_approved=user_data.is_active,
+            email=user_data.email,
+            node_name=node_name,
+        )
+
+    except InvalidToken:
         raise HTTPException(
             status_code=400,
-            detail="Invalid UUID format"
-        )
-
-    except SQLAlchemyError as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Database error: {e}"
+            detail="Invalid encrypted ID",
         )

@@ -4,10 +4,15 @@ from sqlalchemy import select
 
 from core.db import get_db_session
 from models.category import Category
+from get_all_categories.schema import CategoryResponse
 
 router = APIRouter()
 
-@router.get("/{ctx_orgid}/{ctx_ndid}/{ctx_ndty}")
+
+@router.get(
+    "/{ctx_orgid}/{ctx_ndid}/{ctx_ndty}",
+    response_model=list[CategoryResponse],
+)
 async def get_all_categories(
     ctx_orgid: str = Path(...),
     ctx_ndid: str = Path(...),
@@ -28,17 +33,15 @@ async def get_all_categories(
         result = await db.execute(stmt)
         rows = result.all()
 
-        items = [
-            {
-                "catid": row.id,
-                "catnm": row.nm,
-                "desc": row.dsc,
-                "crtat": row.crtat,
-            }
+        return [
+            CategoryResponse(
+                catid=row.id,
+                catnm=row.nm,
+                desc=row.dsc,
+                crtat=row.crtat,
+            )
             for row in rows
         ]
-
-        return items
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Server Error: {e}")

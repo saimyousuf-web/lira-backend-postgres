@@ -1,25 +1,52 @@
-import uuid
-from sqlalchemy import Column, String, Boolean, ForeignKey, DateTime, UniqueConstraint, func
-from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import relationship
+from datetime import datetime
+from uuid import UUID, uuid4
+
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    ForeignKey,
+    String,
+    UniqueConstraint,
+    func,
+)
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
 from core.db import Base
 
 
 class NodeType(Base):
     __tablename__ = "node_types"
 
-    id   = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    ty = Column(String(10), nullable=False, unique=True)
+    id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid4,
+    )
+
+    ty: Mapped[str] = mapped_column(
+        String(10),
+        nullable=False,
+        unique=True,
+    )
 
 
 class Node(Base):
     __tablename__ = "nodes"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    ndtyid = Column(UUID(as_uuid=True), ForeignKey("node_types.id"), nullable=False)
+    id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid4,
+    )
 
-    ndty = relationship("NodeType")
+    ndtyid: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("node_types.id"),
+        nullable=False,
+    )
 
+    ndty: Mapped[NodeType] = relationship()
 
 
 class Org(Base):
@@ -28,18 +55,71 @@ class Org(Base):
         UniqueConstraint("nm", name="uq_org_name"),
     )
 
-    ndid      = Column(UUID(as_uuid=True), ForeignKey("nodes.id", ondelete="CASCADE"), primary_key=True)
-    orgid       = Column(UUID(as_uuid=True), ForeignKey("orgs.ndid"), nullable=False)  # self-ref
-    prtndid    = Column(UUID(as_uuid=True), nullable=True, default=None)
-    nm         = Column(String(255), nullable=False)
-    title        = Column(String(255))
-    favicon_path = Column(String, nullable=True)
-    logo_path    = Column(String, nullable=True)
-    isact    = Column(Boolean, nullable=False, default=True)
-    crtby   = Column(UUID(as_uuid=True))
-    updby   = Column(UUID(as_uuid=True))
-    crtat   = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    updat   = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    ndid: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("nodes.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+
+    orgid: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("orgs.ndid"),
+        nullable=False,
+    )
+
+    prtndid: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        nullable=True,
+        default=None,
+    )
+
+    nm: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False,
+    )
+
+    title: Mapped[str | None] = mapped_column(
+        String(255),
+        nullable=True,
+    )
+
+    favicon_path: Mapped[str | None] = mapped_column(
+        String,
+        nullable=True,
+    )
+
+    logo_path: Mapped[str | None] = mapped_column(
+        String,
+        nullable=True,
+    )
+
+    isact: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+    )
+
+    crtby: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        nullable=True,
+    )
+
+    updby: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        nullable=True,
+    )
+
+    crtat: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    updat: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
 
 
 class Dept(Base):
@@ -48,15 +128,56 @@ class Dept(Base):
         UniqueConstraint("prtndid", "nm", name="uq_dept_name_per_parent"),
     )
 
-    ndid    = Column(UUID(as_uuid=True), ForeignKey("nodes.id", ondelete="CASCADE"), primary_key=True)
-    orgid     = Column(UUID(as_uuid=True), ForeignKey("orgs.ndid"), nullable=False)
-    prtndid  = Column(UUID(as_uuid=True), ForeignKey("nodes.id"), nullable=False)
-    nm       = Column(String(255), nullable=False)
-    isact  = Column(Boolean, nullable=False, default=True)
-    crtby = Column(UUID(as_uuid=True))
-    updby = Column(UUID(as_uuid=True))
-    crtat = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    updat = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    ndid: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("nodes.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+
+    orgid: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("orgs.ndid"),
+        nullable=False,
+    )
+
+    prtndid: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("nodes.id"),
+        nullable=False,
+    )
+
+    nm: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False,
+    )
+
+    isact: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+    )
+
+    crtby: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        nullable=True,
+    )
+
+    updby: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        nullable=True,
+    )
+
+    crtat: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    updat: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
 
 
 class Func(Base):
@@ -65,12 +186,53 @@ class Func(Base):
         UniqueConstraint("prtndid", "nm", name="uq_func_name_per_parent"),
     )
 
-    ndid    = Column(UUID(as_uuid=True), ForeignKey("nodes.id", ondelete="CASCADE"), primary_key=True)
-    orgid     = Column(UUID(as_uuid=True), ForeignKey("orgs.ndid"), nullable=False)
-    prtndid  = Column(UUID(as_uuid=True), ForeignKey("nodes.id"), nullable=False)
-    nm       = Column(String(255), nullable=False)
-    isact  = Column(Boolean, nullable=False, default=True)
-    crtby = Column(UUID(as_uuid=True))
-    updby = Column(UUID(as_uuid=True))
-    crtat = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    updat = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    ndid: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("nodes.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+
+    orgid: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("orgs.ndid"),
+        nullable=False,
+    )
+
+    prtndid: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("nodes.id"),
+        nullable=False,
+    )
+
+    nm: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False,
+    )
+
+    isact: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+    )
+
+    crtby: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        nullable=True,
+    )
+
+    updby: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        nullable=True,
+    )
+
+    crtat: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    updat: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )

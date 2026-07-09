@@ -4,6 +4,7 @@ from sqlalchemy import select
 import uuid
 from dependencies.auth import require_permission
 from core.db import get_db_session
+from get_all_courses.schema import CourseResponse
 from models.course import Course
 from models.course_node import CourseNode
 
@@ -32,19 +33,17 @@ async def get_all_courses(
         result = await db.execute(stmt)
         courses = result.mappings().all()
 
-
-        items = [
-            {
-                "cid": course["id"],
-                "cnm": course["nm"],
-                "desc": course["dsc"],
-                "crtat": course["crtat"],
-            }
+        
+        return [
+            CourseResponse(
+                cid=course["id"],
+                cnm=course["nm"],
+                desc=course["dsc"],
+                crtat=course["crtat"],
+            )
             for course in courses
         ]
-
-        return items
-
+    
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid node id")
 

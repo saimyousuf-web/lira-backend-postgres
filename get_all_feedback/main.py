@@ -1,8 +1,10 @@
+from cryptography.fernet import InvalidToken
 from fastapi import APIRouter, HTTPException, Depends, Path
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-import uuid
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from core.db import get_db_session
+from core.id_cypher import decrypt_id
 from get_all_feedback.schema import FeedbackResponse
 from models.feedback import Feedback
 from models.course import Course
@@ -16,12 +18,13 @@ router = APIRouter()
     response_model=list[FeedbackResponse],
 )
 async def get_all_feedback_router(
-    ctx_orgid: uuid.UUID = Path(...),
+    ctx_orgid: str = Path(...),
     ctx_ndid: str = Path(...),
     ctx_ndty: str = Path(...),
     db: AsyncSession = Depends(get_db_session),
 ):
     try:
+        node_id = decrypt_id(ctx_ndid)
 
         stmt = (
             select(
@@ -38,7 +41,7 @@ async def get_all_feedback_router(
                 Feedback.sessid == Session.id,
             )
             .where(
-                Feedback.ndid == ctx_orgid
+                Feedback.ndid == node_id
             )
             .order_by(
                 Feedback.crtat.desc()
@@ -50,10 +53,10 @@ async def get_all_feedback_router(
 
         return [
             FeedbackResponse(
-                fid=str(feedback.id),
-                cid=str(feedback.cid),
+                fid=feedback.id,
+                cid=feedback.cid,
                 cnm=course_name,
-                convid=str(feedback.convid),
+                convid=feedback.convid,
                 crtat=feedback.crtat,
                 evtmsg=event_message,
                 evtquery=feedback.sessquery,
@@ -65,6 +68,12 @@ async def get_all_feedback_router(
             )
             for feedback, course_name, event_message in rows
         ]
+
+    except InvalidToken:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid encrypted ID",
+        )
 
     except Exception as e:
         raise HTTPException(

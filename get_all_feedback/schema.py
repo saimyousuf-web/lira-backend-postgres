@@ -1,11 +1,16 @@
 from datetime import datetime
-from pydantic import BaseModel
+from uuid import UUID
+
+from pydantic import BaseModel, field_serializer
+
+from core.id_cypher import encrypt_id
+
 
 class FeedbackResponse(BaseModel):
-    fid: str
-    cid: str
+    fid: UUID
+    cid: UUID
     cnm: str
-    convid: str
+    convid: UUID
     crtat: datetime
     evtmsg: str | None
     evtquery: str | None
@@ -14,3 +19,7 @@ class FeedbackResponse(BaseModel):
     rsn: str | None
     smeres: str | None
     sts: str
+
+    @field_serializer("fid", "cid", "convid")
+    def serialize_ids(self, value: UUID) -> str:
+        return encrypt_id(value)

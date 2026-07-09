@@ -4,12 +4,12 @@ from pydantic import BaseModel, field_serializer
 from core.id_cypher import encrypt_id
 
 
-class CourseResponse(BaseModel):
-    cid: UUID
-    cnm: str
+class CategoryResponse(BaseModel):
+    catid: UUID
+    catnm: str
     desc: str | None
     crtat: datetime
 
-    @field_serializer("cid")
-    def serialize_cid(self, value: UUID) -> str:
+    @field_serializer("catid")
+    def serialize_id(self, value: UUID) -> str:
         return encrypt_id(value)

@@ -1,6 +1,7 @@
 import uuid
 from xml.dom import Node
 from auth.main import get_current_user
+from get_user_org_access_details.schema import UserOrgAccessResponse
 from models.lira_access import LiraAccess
 from models.nodes import Dept, Func, NodeType, Org
 from models.user import User
@@ -83,18 +84,20 @@ async def get_user_details(
                 continue
             seen_orgs.add(orgid)
 
-            result.append({
-                "userId": str(user_id),
-                "name": user_name,
-                "user_email": user_email,
-                "orgid": str(orgid),
-                "ndid": str(orgid),
-                "ndty": "ORG",
-                "ndname": row.org_name,
-                "prtndid": str(row.prtndid) if row.prtndid else "ROOT",
-                "role": "ADMIN",
-                "permissions": permission_names
-            })
+            result.append(
+                UserOrgAccessResponse(
+                    userId=user_id,
+                    name=user_name,
+                    user_email=user_email,
+                    orgid=orgid,
+                    ndid=orgid,
+                    ndty="ORG",
+                    ndname=row.org_name,
+                    prtndid=str(row.prtndid) if row.prtndid else "ROOT",
+                    role="ADMIN",
+                    permissions=permission_names,
+                )
+            )
 
         return result
 
