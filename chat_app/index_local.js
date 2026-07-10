@@ -193,14 +193,12 @@ app.post("/stream", async (req, res) => {
       writeLine(res, { type: "done" });
 
     } else {
-      /* ── TEXT MODE — original logic, untouched ─────────────────────────── */
+      /* ── TEXT MODE ─────────────────────────── */
 
-      res.write(
-        JSON.stringify({
-          type: "message_start",
-          message_id: storage_metadata?.message_id,
-        }) + "\n",
-      );
+      writeLine(res, {
+        type: "message_start",
+        message_id: storage_metadata?.message_id,
+      });
 
       let buffer = "";
 
@@ -219,20 +217,22 @@ app.post("/stream", async (req, res) => {
           fullResponse += text;
 
           if (buffer.length > 10 || /[\s.,!?]$/.test(buffer)) {
-            res.write(buffer);
+            writeLine(res, { type: "text", text: buffer });
             buffer = "";
           }
         }
       }
 
-      if (buffer) res.write(buffer);
+      if (buffer) writeLine(res, { type: "text", text: buffer });
+
+      writeLine(res, { type: "done" });
     }
-    
-    console.log('-------------full_response-------- ', fullResponse)
-    
+
+    console.log("-------------full_response-------- ", fullResponse);
+
     /* ---------- 4. Save (same for both modes) ---------- */
-    console.log('saved called');
-    
+    console.log("saved called");
+
     fetch(PYTHON_SAVE_URL, {
       method: "POST",
       headers: {
