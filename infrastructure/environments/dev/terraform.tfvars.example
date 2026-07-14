@@ -1,0 +1,17 @@
+environment = ""
+
+aws_region = ""
+
+vpc_cidr = ""
+
+public_subnet_a_cidr = ""
+public_subnet_a_az   = ""
+
+public_subnet_b_cidr = ""
+public_subnet_b_az   = ""
+
+private_subnet_a_cidr = ""
+private_subnet_a_az   = ""
+
+private_subnet_b_cidr = ""
+private_subnet_b_az   = ""

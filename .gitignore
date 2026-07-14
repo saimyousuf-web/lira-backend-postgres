@@ -31,3 +31,14 @@ Thumbs.db
 
 node_modules
 .env
+
+
+# Terraform
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+
+# Keep provider lock file
+!.terraform.lock.hcl

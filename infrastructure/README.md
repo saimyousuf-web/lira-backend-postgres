@@ -1,0 +1,1 @@
+sam deploy --parameter-overrides liraEnv=dev LambdaSecurityGroupId=<terraform-output> PrivateSubnetA=<terraform-output> PrivateSubnetB=<terraform-output> DbSecretArn=<terraform-output>

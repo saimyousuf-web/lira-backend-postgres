@@ -89,6 +89,8 @@ class RagService:
         analysis = await analyze_user_message(user_message,context_history,coach_mode,step,voice_mode)
 
         intent = analysis.get("intent")
+
+        print("Intent:", intent)
         
         decision_mode = analysis.get("decision_mode")
         
@@ -100,8 +102,6 @@ class RagService:
         top_k = self._get_top_k(intent, coach_mode, voice_mode, step)
 
         docs_task = self.retrieve_relevant_docs(organization_id, query, course_id, top_k)
-
-        print(docs_task)
         
         
         feedback = await self.feedback_repo.get_top_feedbacks(organization_id, course_id)
@@ -239,8 +239,6 @@ class RagService:
                 ),
                 with_payload=True,
             )
-
-            print(results)
 
         except Exception as e:
             raise HTTPException(
