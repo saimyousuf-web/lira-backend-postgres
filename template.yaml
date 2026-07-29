@@ -1,0 +1,105 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Lira Backend Platform App Api
+
+Parameters:
+  liraEnv:
+    Type: String
+    Description: Deployment environment (e.g. dev, prod)
+    AllowedValues:
+      - dev
+      - prod
+      - qa
+
+  LambdaSecurityGroupId:
+    Type: String
+    Description: Lambda Security Group ID
+
+  PrivateSubnetA:
+    Type: String
+    Description: Private Subnet A ID
+
+  PrivateSubnetB:
+    Type: String
+    Description: Private Subnet B ID
+
+  DbSecretArn:
+    Type: String
+    Description: Secrets Manager ARN
+
+Globals:
+  Function:
+    Timeout: 120
+    MemorySize: 512
+
+Resources:
+  PlatformAppApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      DisableExecuteApiEndpoint: false
+      CorsConfiguration:
+        AllowOrigins:
+          - "*"
+          - https://dpc1kyz2qo8jh.cloudfront.net
+          - http://localhost:5173
+        AllowMethods:
+          - GET
+          - POST
+          - PUT
+          - OPTIONS
+          - DELETE
+        AllowHeaders:
+          - Content-Type
+          - Authorization
+
+  LiraBackendFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      PackageType: Image
+      FunctionName: lira_backend
+
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref LambdaSecurityGroupId
+        SubnetIds:
+          - !Ref PrivateSubnetA
+          - !Ref PrivateSubnetB
+
+      Environment:
+        Variables:
+          DB_SECRET_ARN: !Ref DbSecretArn
+
+      Policies:
+        - AWSLambdaVPCAccessExecutionRole
+        - Statement:
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource: !Ref DbSecretArn
+
+      Events:
+        RootRoute:
+          Type: HttpApi
+          Properties:
+            Path: /
+            Method: ANY
+            ApiId: !Ref PlatformAppApi
+
+        ProxyRoute:
+          Type: HttpApi
+          Properties:
+            Path: /{proxy+}
+            Method: ANY
+            ApiId: !Ref PlatformAppApi
+
+    Metadata:
+      Dockerfile: Dockerfile
+      DockerContext: .
+      DockerTag: latest
+
+Outputs:
+  PlatformAppApiEndpoint:
+    Description: API endpoint for the app service
+    Value: !Sub "https://${PlatformAppApi}.execute-api.${AWS::Region}.amazonaws.com"
+    Export:
+      Name: !Sub "PlatformAppApi-${liraEnv}"
