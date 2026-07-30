@@ -1,97 +1,67 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Path, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
-import uuid
+from uuid import UUID
 
 from core.db import get_db_session
-from models.course import Course
+from auth.main import get_current_user
 from models.cat_course import CatCourse
-from models.course_node import CourseNode
+from models.course import Course
 from models.nodes import Node, NodeType
-from dependencies.auth import require_permission
+
+import logging
+
 
 router = APIRouter()
 
+logger = logging.getLogger(__name__)
 
-@router.get("/{ctx_orgid}/{ctx_ndid}/{ctx_ndty}/{catid}")
-async def get_course_by_catid(
-    ctx_orgid: str,
-    ctx_ndid: str,
-    ctx_ndty: str,
-    catid: str,
-    # user=Depends(require_permission("read:course")),
+@router.get("/")
+async def get_courses_by_category(
+    catid: UUID = Query(None, description="Filter by Category ID"),
+    user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session),
 ):
     try:
-        node_id = uuid.UUID(ctx_ndid)
-        category_id = uuid.UUID(catid)
-
-        # Validate node
-        stmt = (
-            select(Node)
-            .join(Node.ndty)
-            .where(
-                Node.id == node_id,
-                NodeType.ty == ctx_ndty,
-            )
-        )
-
-        result = await db.execute(stmt)
-        node = result.scalar_one_or_none()
-
-        if not node:
-            raise HTTPException(
-                status_code=404,
-                detail="Node not found"
-            )
-
-        # Get courses for category + node
-        stmt = (
-        select(
-        Course.id,
-        Course.nm,
-        Course.dsc,
-        Course.crtat,
-        Course.updat
-        )
+        result = await db.execute(
+            select(Course)
             .join(CatCourse, CatCourse.cid == Course.id)
-            # .join(CourseNode, CourseNode.cid == Course.id)
-            .where(
-                CatCourse.catid == category_id
-                # CourseNode.ndid == node.id,
-            )
+            .where(CatCourse.catid == catid)
         )
 
-        result = await db.execute(stmt)
-        courses = result.all()
+        courses = result.scalars().all()
 
-        data = [
+        if not courses:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No courses found for the given category.",
+            )
+
+        return [
             {
-                "cid": course.id,
-                "cnm": course.nm,
-                "desc": course.dsc,
-                "crtat": course.crtat,
-                "updat": course.updat,
+                "id": course.id,
+                "name": course.nm,
+                "description": course.dsc,
+                "status": course.sts,
             }
             for course in courses
         ]
 
-        return {
-            "status": "success",
-            "status_code": 200,
-            "data": data,
-            "message": "Course retrieved successfully",
-        }
+    except HTTPException:
+        raise
 
-    except ValueError:
+    except SQLAlchemyError as ex:
+        logger.exception("Database error while fetching courses by category.")
         raise HTTPException(
-            status_code=400,
-            detail="Invalid UUID format"
-        )
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="A database error occurred while fetching courses.",
+        ) from ex
 
-    except SQLAlchemyError as e:
+    except Exception as ex:
+        logger.exception("Unexpected error while fetching courses by category.")
         raise HTTPException(
-            status_code=500,
-            detail=f"Database error: {e}"
-        )
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An unexpected error occurred.",
+        ) from ex
+        
