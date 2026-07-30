@@ -14,8 +14,8 @@ router = APIRouter()
 
 @router.get("/{orgid}/{ndid}/{ndty}")
 async def get_user_current_info(
-    orgid: UUID,
-    ndid: UUID,
+    orgid: str,
+    ndid: str,
     ndty: str,
     user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session)
