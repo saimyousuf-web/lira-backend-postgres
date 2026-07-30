@@ -40,10 +40,10 @@ async def get_courses_by_category(
 
         return [
             {
-                "id": course.id,
-                "name": course.nm,
-                "description": course.dsc,
-                "status": course.sts,
+                "cid": course.id,
+                "cnm": course.nm,
+                "crtat": course.crtat,
+                "desc": course.dsc,
             }
             for course in courses
         ]
