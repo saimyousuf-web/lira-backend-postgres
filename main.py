@@ -85,6 +85,7 @@ def create_app() -> FastAPI:
     app.include_router(get_category_by_cid_router,prefix="/get-category-by-course-id",tags=["Category Management"])
     app.include_router(get_all_courses_router, prefix="/get-all-courses", tags=["Course Management"])
     app.include_router(create_course_router, prefix="/create-course", tags=["Course Management"])
+    app.include_router(get_course_by_catid_router, prefix="/courses", tags=["Course Management"])
 
     # Chat
     app.include_router(get_chat_history_router, prefix = "/chats"  ,tags=["Query Orchestration APIs"])
