@@ -59,6 +59,9 @@ class RagService:
         user_name= user['username']
         conversation_id = data["chat_id"]
         checkboxed_message = data["active_message_checkbox"]
+        llm_user_message = user_message
+        if (checkboxed_message and checkboxed_message.get("mcqAns")):
+            llm_user_message = json.dumps(checkboxed_message["mcqAns"])
         step = None
         step_description=None
         next_step=None
@@ -86,7 +89,7 @@ class RagService:
         
         context_history = self._build_context(chat_history, coach_mode, voice_mode)
 
-        analysis = await analyze_user_message(user_message,context_history,coach_mode,step,voice_mode)
+        analysis = await analyze_user_message(llm_user_message,context_history,coach_mode,step,voice_mode,)
 
         intent = analysis.get("intent")
 
@@ -94,7 +97,7 @@ class RagService:
         
         decision_mode = analysis.get("decision_mode")
         
-        query = analysis.get("search_query", user_message)
+        query = analysis.get("search_query", llm_user_message)
 
         if coach_mode and step not in ['done']:
             step_description, next_step = self._get_step_context(step, coach_mode, voice_mode)
@@ -128,7 +131,7 @@ class RagService:
             voice_mode=voice_mode,
             context_history=context_history,
             stringified_docs = stringified_docs,
-            user_message=user_message,
+            user_message=llm_user_message,
             citation_html = citation_html,
             user_name=user_name,
             core_principle = core_principle,
