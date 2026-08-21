@@ -102,8 +102,8 @@ async def process_storyline_internal(
     user_id = uuid.UUID("6418e458-50a1-70fe-9d3e-b52f5d2df57c")
 
     try:
-        course_uuid = uuid.UUID(course_id)
-        module_uuid = uuid.UUID(document_id)
+        course_uuid = course_id
+        module_uuid = document_id
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid UUID format")
 
@@ -183,7 +183,7 @@ async def process_storyline_internal(
 
         # --- Images ---
         valuable_images = extract_valuable_images_from_storyline_zip(z)
-        storyline_images_to_s3(z, valuable_images, course_id, org_id, document_id, S3_BUCKET)
+        # storyline_images_to_s3(z, valuable_images, course_id, org_id, document_id, S3_BUCKET)
 
         # --- Build normalised pages ---
         storyline_pages = []
@@ -334,6 +334,10 @@ def _embed_and_upsert_qdrant(
     slide_title: str = "",
 ) -> tuple[str, int]:
     try:
+
+        if not text or not text.strip():
+            print(f"Skipping empty chunk {chunk_id}")
+            return "skipped", 0
         response = bedrock_client.invoke_model(
             modelId="amazon.titan-embed-text-v2:0",
             contentType="application/json",
@@ -341,6 +345,8 @@ def _embed_and_upsert_qdrant(
         )
         body      = json.loads(response["body"].read())
         embedding = body.get("embedding")
+
+
 
         if not (isinstance(embedding, list) and len(embedding) == 1024):
             return "failed", 0
@@ -351,9 +357,7 @@ def _embed_and_upsert_qdrant(
             points=[
                 PointStruct(
                     id=str(chunk_id),
-                    vector={
-                        "vector": normalized
-                    },
+                    vector=normalized,
                     payload={
                         "chunk_id":        str(chunk_id),
                         "organization_id": org_id,

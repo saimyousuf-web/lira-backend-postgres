@@ -456,6 +456,7 @@ async def chunk_and_embed_pdf(
             imgkeys=img_keys,
             crtby=user_id,
             updby=user_id,
+            slideidx=page_num,
         )
         db.add(chunk_row)
 

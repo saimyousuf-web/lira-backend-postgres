@@ -8,6 +8,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Index,
+    Numeric,
 )
 from sqlalchemy.dialects.postgresql import UUID, ARRAY
 from sqlalchemy.sql import func
@@ -75,5 +76,10 @@ class Chunk(Base):
     
     imgkeys = Column(
         ARRAY(Text),
+        nullable=True,
+    )
+
+    slideidx = Column(
+        Numeric(precision=10, scale=2),
         nullable=True,
     )
